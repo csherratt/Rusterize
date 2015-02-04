@@ -10,6 +10,7 @@ use genmesh::generators::{Cube};
 use genmesh::{Triangulate, MapToVertices};
 use std::old_io::File;
 use test::{Bencher, black_box};
+use image::Rgb;
 
 #[bench]
 fn cube(bench: &mut Bencher) {
@@ -18,6 +19,8 @@ fn cube(bench: &mut Bencher) {
     bench.iter(|| {
         let cube = Cube::new();
         frame.raster(cube.triangulate()
-                         .vertex(|v| Vector4::new(v.0, v.1, v.2, 1.).mul_s(0.25)));
+                         .vertex(|v| Vector4::new(v.0, v.1, v.2, 1.).mul_s(0.25)),
+            |_, _| { Rgb([1, 1, 1]) }
+        );
     });
 }

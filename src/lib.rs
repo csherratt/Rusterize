@@ -1,3 +1,5 @@
+#![feature(unboxed_closures)]
+
 extern crate image;
 extern crate genmesh;
 extern crate cgmath;
@@ -22,14 +24,16 @@ impl Frame {
         }
     }
 
-    pub fn raster<S>(&mut self, vertex: S)
-        where S: Iterator<Item=Triangle<Vector4<f32>>> {
+    #[inline]
+    pub fn raster<S, F>(&mut self, poly: S, mut fragment: F)
+        where S: Iterator<Item=Triangle<Vector4<f32>>>,
+              F: FnMut<(f32, f32), Output=Rgb<u8>> {
 
         let h = self.frame.height();
         let w = self.frame.width();
         let (hf, wf) = (h as f32, w as f32);
         let (hh, wh) = (hf/2., wf/2.);
-        for t in vertex {
+        for t in poly {
             let clip = t.map_vertex(|v| {
                 Vector4::new(
                     hh * v.x + hh,
@@ -43,17 +47,16 @@ impl Frame {
             let max_y = clip.x.y.partial_max(clip.y.y.partial_max(clip.z.y)).partial_max(0.).partial_min(wf);
             let min_y = clip.x.y.partial_min(clip.y.y.partial_min(clip.z.y)).partial_max(0.).partial_min(wf);
 
-            for x in (min_x as u32..max_x as u32+1) {
-                for y in (min_y as u32..max_y as u32+1) {
-                    let q = Vector2::new(x as f32,
-                                         y as f32);
+            for y in (min_y as u32..max_y as u32+1) {
+                for x in (min_x as u32..max_x as u32+1) {
+                    let q = Vector2::new(x as f32, y as f32);
 
                     let w0 = orient2d(clip.y, clip.z, q);
                     let w1 = orient2d(clip.z, clip.x, q);
                     let w2 = orient2d(clip.x, clip.y, q);
 
                     if w0 >= 0. && w1 >= 0. && w2 >= 0. {
-                        self.frame.put_pixel(x, y, Rgb([x as u8, y as u8, 0]));
+                        self.frame.put_pixel(x, y, fragment(x as f32, y as f32));
                     }
                 }
             }
