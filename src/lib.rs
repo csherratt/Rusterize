@@ -55,10 +55,10 @@ impl Frame {
             });
             let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
 
-            let max_x = clip.x.x.floor().partial_max(clip.y.x.floor().partial_max(clip.z.x.floor())).partial_max(0.).partial_min(hf);
-            let min_x = clip.x.x.ceil().partial_min(clip.y.x.ceil().partial_min(clip.z.x.ceil())).partial_max(0.).partial_min(hf);
-            let max_y = clip.x.y.floor().partial_max(clip.y.y.floor().partial_max(clip.z.y.floor())).partial_max(0.).partial_min(wf);
-            let min_y = clip.x.y.ceil().partial_min(clip.y.y.ceil().partial_min(clip.z.y.ceil())).partial_max(0.).partial_min(wf);
+            let max_x = clip.x.x.ceil().partial_max(clip.y.x.ceil().partial_max(clip.z.x.ceil())).partial_max(0.).partial_min(hf);
+            let min_x = clip.x.x.floor().partial_min(clip.y.x.floor().partial_min(clip.z.x.floor())).partial_max(0.).partial_min(hf);
+            let max_y = clip.x.y.ceil().partial_max(clip.y.y.ceil().partial_max(clip.z.y.ceil())).partial_max(0.).partial_min(wf);
+            let min_y = clip.x.y.floor().partial_min(clip.y.y.floor().partial_min(clip.z.y.floor())).partial_max(0.).partial_min(wf);
 
             let points = clip4.map_vertex(|v| Point3::new(v.x, v.y, v.z));
             let plane = if let Some(plane) = Plane::from_points(points.x, points.y, points.z) {
@@ -89,7 +89,7 @@ impl Frame {
                     let u = (d11 * d02 - d01 * d12) * inv_denom;
                     let v = (d00 * d12 - d01 * d02) * inv_denom;
 
-                    if /*z >= 0. && z <= 1. && */ dz[0] > z && u >= 0. && v >= 0. && (u + v) <= 1. {
+                    if z >= 0. && z <= 1. && dz[0] > z && u >= 0. && v >= 0. && (u + v) <= 1. {
                         self.frame.put_pixel(x, y, fragment(v, 1. - (u+v), u));
                         self.depth.put_pixel(x, y, Luma([z]));
                     }

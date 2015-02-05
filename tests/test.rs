@@ -36,7 +36,7 @@ fn check(name: &str, frame: Frame) {
 }
 
 fn proj() -> Matrix4<f32> {
-    ortho(-1., 1., -1., 1., -10., 10.)
+    ortho(-1., 1., -1., 1., -100., 10.)
 }
 
 #[test]
