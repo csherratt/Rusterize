@@ -24,6 +24,14 @@ fn area(a: Vector2<f32>, b: Vector2<f32>, c: Vector2<f32>) -> f32 {
     ((a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y)) * 0.5).abs()
 }
 
+#[inline]
+fn is_backface(v: Triangle<Vector3<f32>>)-> bool {
+    let e0 = v.z - v.x;
+    let e1 = v.z - v.y;
+    let normal = e1.cross(&e0);
+    Vector3::new(0., 0., 1.).dot(&normal) >= 0.
+}
+
 impl Frame {
     pub fn new(width: u32, height: u32) -> Frame {
         Frame {
@@ -41,6 +49,10 @@ impl Frame {
         let (hf, wf) = (h as f32, w as f32);
         let (hh, wh) = (hf/2., wf/2.);
         for t in poly {
+            if is_backface(t.map_vertex(|v| Vector3::new(v.x, v.y, v.z))) {
+                continue;
+            }
+
             let clip4 = t.map_vertex(|v| {
                 Vector4::new(
                     hh * v.x + hh,
