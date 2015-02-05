@@ -71,7 +71,7 @@ impl Frame {
                         let a1 = area(clip.z, clip.x, q) * a_total;
                         let a2 = area(clip.x, clip.y, q) * a_total;
 
-                        //self.frame.put_pixel(x, y, fragment(a0, a1, a2));
+                        self.frame.put_pixel(x, y, fragment(a0, a1, a2));
                     }
                 }
             }
