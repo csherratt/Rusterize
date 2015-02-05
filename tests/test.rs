@@ -52,3 +52,37 @@ fn test_plane_backface() {
     let img = image::open(&Path::new("test_data/expected/plane_backface.png")).unwrap();
     assert!(img.raw_pixels() == frame.frame.as_slice());
 }
+
+#[test]
+fn test_plane_fill() {
+    let mut frame = Frame::new(16, 16);
+    let cube = generators::Plane::new()
+        .triangulate()
+        .vertex(|v| Vector4::new(v.0, v.1, 0., 1.));
+
+    frame.raster(cube, |_, _, _| {
+        Rgb([255, 255, 255])
+    });
+
+    save("test_data/results/plane_fill.png", frame.frame.clone());
+
+    let img = image::open(&Path::new("test_data/expected/plane.png")).unwrap();
+    assert!(img.raw_pixels() == frame.frame.as_slice());
+}
+
+#[test]
+fn test_plane_overfill() {
+    let mut frame = Frame::new(16, 16);
+    let cube = generators::Plane::new()
+        .triangulate()
+        .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).mul_s(100.0));
+
+    frame.raster(cube, |_, _, _| {
+        Rgb([255, 255, 255])
+    });
+
+    save("test_data/results/plane_overfill.png", frame.frame.clone());
+
+    let img = image::open(&Path::new("test_data/expected/plane.png")).unwrap();
+    assert!(img.raw_pixels() == frame.frame.as_slice());
+}
