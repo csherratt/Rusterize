@@ -1,4 +1,4 @@
-#![feature(path)]
+#![feature(path, io)]
 
 extern crate image;
 extern crate genmesh;
@@ -75,4 +75,48 @@ fn plane_overfill() {
     });
 
     check("plane_overfill.png", frame.frame.clone());
+}
+
+#[test]
+fn plane_back_front() {
+    let mut frame = Frame::new(16, 16);
+    let cube = generators::Plane::new()
+        .triangulate()
+        .vertex(|v| Vector4::new(v.0, v.1, 0., 1.));
+
+    frame.raster(cube, |_, _, _| {
+        Rgb([255, 255, 255])
+    });
+
+    let cube = generators::Plane::new()
+        .triangulate()
+        .vertex(|v| Vector4::new(v.0, v.1, 1., 1.));
+
+    frame.raster(cube, |_, _, _| {
+        Rgb([128, 128, 128])
+    });
+
+    check("plane_back_front.png", frame.frame.clone());
+}
+
+#[test]
+fn plane_front_back() {
+    let mut frame = Frame::new(16, 16);
+    let cube = generators::Plane::new()
+        .triangulate()
+        .vertex(|v| Vector4::new(v.0, v.1, 1., 1.));
+
+    frame.raster(cube, |_, _, _| {
+        Rgb([255, 255, 255])
+    });
+
+    let cube = generators::Plane::new()
+        .triangulate()
+        .vertex(|v| Vector4::new(v.0, v.1, 0., 1.));
+
+    frame.raster(cube, |_, _, _| {
+        Rgb([128, 128, 128])
+    });
+
+    check("plane_front_back.png", frame.frame.clone());
 }
