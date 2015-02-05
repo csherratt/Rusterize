@@ -9,19 +9,10 @@ use cgmath::*;
 use genmesh::{Triangle, MapVertex};
 use std::num::Float;
 
+#[derive(Clone)]
 pub struct Frame {
     pub frame: ImageBuffer<Rgb<u8>, Vec<u8>>,
     pub depth: ImageBuffer<Luma<f32>, Vec<f32>>
-}
-
-#[inline]
-fn orient2d(a: Vector2<f32>, b: Vector2<f32>, c: Vector2<f32>) -> f32 {
-    (b.x-a.x) * (c.y-a.y) - (b.y-a.y) * (c.x-a.x)
-}
-
-#[inline]
-fn area(a: Vector2<f32>, b: Vector2<f32>, c: Vector2<f32>) -> f32 {
-    ((a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y)) * 0.5).abs()
 }
 
 #[inline]
@@ -36,7 +27,7 @@ impl Frame {
     pub fn new(width: u32, height: u32) -> Frame {
         Frame {
             frame: ImageBuffer::new(width, height),
-            depth: ImageBuffer::new(width, height)
+            depth: ImageBuffer::from_pixel(width, height, Luma([1.]))
         }
     }
 
@@ -56,45 +47,50 @@ impl Frame {
 
             let clip4 = t.map_vertex(|v| {
                 Vector4::new(
-                    hh * v.x + hh,
-                    wh * v.y + wh,
-                    v.z,
-                    v.w
+                    hh * (v.x / v.w) + hh,
+                    wh * (v.y / v.w) + wh,
+                    v.z / v.w,
+                    v.w / v.w
                 )
             });
             let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
 
-            let max_x = clip.x.x.partial_max(clip.y.x.partial_max(clip.z.x)).partial_max(0.).partial_min(hf);
-            let min_x = clip.x.x.partial_min(clip.y.x.partial_min(clip.z.x)).partial_max(0.).partial_min(hf);
-            let max_y = clip.x.y.partial_max(clip.y.y.partial_max(clip.z.y)).partial_max(0.).partial_min(wf);
-            let min_y = clip.x.y.partial_min(clip.y.y.partial_min(clip.z.y)).partial_max(0.).partial_min(wf);
+            let max_x = clip.x.x.floor().partial_max(clip.y.x.floor().partial_max(clip.z.x.floor())).partial_max(0.).partial_min(hf);
+            let min_x = clip.x.x.ceil().partial_min(clip.y.x.ceil().partial_min(clip.z.x.ceil())).partial_max(0.).partial_min(hf);
+            let max_y = clip.x.y.floor().partial_max(clip.y.y.floor().partial_max(clip.z.y.floor())).partial_max(0.).partial_min(wf);
+            let min_y = clip.x.y.ceil().partial_min(clip.y.y.ceil().partial_min(clip.z.y.ceil())).partial_max(0.).partial_min(wf);
 
-            let points = t.map_vertex(|v| Point3::new(v.x, v.y, v.z));
+            let points = clip4.map_vertex(|v| Point3::new(v.x, v.y, v.z));
             let plane = if let Some(plane) = Plane::from_points(points.x, points.y, points.z) {
                 plane
             } else {
                 continue;
             };
 
-            let a_total = 1. / area(clip.x, clip.y, clip.z);
             let z_inv = 1. / plane.n.z;
 
             for y in (min_y as u32..max_y as u32) {
                 for x in (min_x as u32..max_x as u32) {
-                    let q = Vector2::new(x as f32, y as f32);
-                    let z = (-plane.d - plane.n.x * q.x - plane.n.y * q.y) * z_inv;
-
-                    let w0 = orient2d(clip.y, clip.z, q);
-                    let w1 = orient2d(clip.z, clip.x, q);
-                    let w2 = orient2d(clip.x, clip.y, q);
-
+                    let p = Vector2::new(x as f32, y as f32);
+                    let z = (-plane.d - plane.n.x * p.x - plane.n.y * p.y) * z_inv;
                     let &Luma(dz) = self.depth.get_pixel(x, y);
-                    if dz[0] < z && w0 >= 0. && w1 >= 0. && w2 >= 0. {
-                        let a0 = area(clip.y, clip.z, q) * a_total;
-                        let a1 = area(clip.z, clip.x, q) * a_total;
-                        let a2 = area(clip.x, clip.y, q) * a_total;
 
-                        self.frame.put_pixel(x, y, fragment(a0, a1, a2));
+                    let v0 = clip.y - clip.x;
+                    let v1 = clip.z - clip.x;
+                    let v2 = p - clip.x;
+
+                    let d00 = v0.dot(&v0);
+                    let d01 = v0.dot(&v1);
+                    let d02 = v0.dot(&v2);
+                    let d11 = v1.dot(&v1);
+                    let d12 = v1.dot(&v2);
+
+                    let inv_denom = 1. / (d00 * d11 - d01 * d01);
+                    let u = (d11 * d02 - d01 * d12) * inv_denom;
+                    let v = (d00 * d12 - d01 * d02) * inv_denom;
+
+                    if /*z >= 0. && z <= 1. && */ dz[0] > z && u >= 0. && v >= 0. && (u + v) <= 1. {
+                        self.frame.put_pixel(x, y, fragment(v, 1. - (u+v), u));
                         self.depth.put_pixel(x, y, Luma([z]));
                     }
                 }
