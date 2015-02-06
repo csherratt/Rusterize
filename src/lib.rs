@@ -31,10 +31,10 @@ impl Frame {
         }
     }
 
-    pub fn raster<S, F, T, O>(&mut self, poly: S, mut fragment: F)
+    pub fn raster<S, F, T>(&mut self, poly: S, mut fragment: F)
         where S: Iterator<Item=Triangle<T>>,
-              F: FnMut<(O,), Output=Rgb<u8>>,
-              T: FetchPosition + Clone + Interpolate<Out=O> {
+              F: FnMut<(T,), Output=Rgb<u8>>,
+              T: FetchPosition + Clone + Interpolate {
 
         let h = self.frame.height();
         let w = self.frame.width();
@@ -139,22 +139,16 @@ impl<A, B, C, D, E, F, G> FetchPosition for ([f32; 4], A, B, C, D, E, F, G) {
 }
 
 pub trait Interpolate {
-    type Out;
-
-    fn interpolate(src: &Triangle<Self>, w: [f32; 3]) -> Self::Out;
+    fn interpolate(src: &Triangle<Self>, w: [f32; 3]) -> Self;
 }
 
 impl Interpolate for f32 {
-    type Out = f32;
-
     fn interpolate(src: &Triangle<f32>, w: [f32; 3]) -> f32 {
         src.x * w[0] + src.y * w[1] + src.z * w[2]
     }
 }
 
 impl Interpolate for [f32; 2] {
-    type Out = [f32; 2];
-
     fn interpolate(src: &Triangle<[f32; 2]>, w: [f32; 3]) -> [f32; 2] {
         [Interpolate::interpolate(&Triangle::new(src.x[0], src.y[0], src.z[0]), w),
          Interpolate::interpolate(&Triangle::new(src.x[1], src.y[1], src.z[1]), w)]
@@ -162,8 +156,6 @@ impl Interpolate for [f32; 2] {
 }
 
 impl Interpolate for [f32; 3] {
-    type Out = [f32; 3];
-
     fn interpolate(src: &Triangle<[f32; 3]>, w: [f32; 3]) -> [f32; 3] {
         [Interpolate::interpolate(&Triangle::new(src.x[0], src.y[0], src.z[0]), w),
          Interpolate::interpolate(&Triangle::new(src.x[1], src.y[1], src.z[1]), w),
@@ -172,12 +164,115 @@ impl Interpolate for [f32; 3] {
 }
 
 impl Interpolate for [f32; 4] {
-    type Out = [f32; 4];
-
     fn interpolate(src: &Triangle<[f32; 4]>, w: [f32; 3]) -> [f32; 4] {
         [Interpolate::interpolate(&Triangle::new(src.x[0], src.y[0], src.z[0]), w),
          Interpolate::interpolate(&Triangle::new(src.x[1], src.y[1], src.z[1]), w),
          Interpolate::interpolate(&Triangle::new(src.x[2], src.y[2], src.z[2]), w),
          Interpolate::interpolate(&Triangle::new(src.x[3], src.y[3], src.z[3]), w)]
+    }
+}
+
+impl<A, B> Interpolate for (A, B)
+    where A: Interpolate + Clone,
+          B: Interpolate + Clone {
+    fn interpolate(src: &Triangle<(A, B)>, w: [f32; 3]) -> (A, B) {
+        (Interpolate::interpolate(&Triangle::new(src.x.0.clone(), src.y.0.clone(), src.z.0.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.1.clone(), src.y.1.clone(), src.z.1.clone()), w))
+    }
+}
+
+impl<A, B, C> Interpolate for (A, B, C)
+    where A: Interpolate + Clone,
+          B: Interpolate + Clone,
+          C: Interpolate + Clone {
+    fn interpolate(src: &Triangle<(A, B, C)>, w: [f32; 3]) -> (A, B, C) {
+        (Interpolate::interpolate(&Triangle::new(src.x.0.clone(), src.y.0.clone(), src.z.0.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.1.clone(), src.y.1.clone(), src.z.1.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.2.clone(), src.y.2.clone(), src.z.2.clone()), w))
+    }
+}
+
+impl<A, B, C, D> Interpolate for (A, B, C, D)
+    where A: Interpolate + Clone,
+          B: Interpolate + Clone,
+          C: Interpolate + Clone,
+          D: Interpolate + Clone {
+    fn interpolate(src: &Triangle<(A, B, C, D)>, w: [f32; 3]) -> (A, B, C, D) {
+        (Interpolate::interpolate(&Triangle::new(src.x.0.clone(), src.y.0.clone(), src.z.0.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.1.clone(), src.y.1.clone(), src.z.1.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.2.clone(), src.y.2.clone(), src.z.2.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.3.clone(), src.y.3.clone(), src.z.3.clone()), w))
+    }
+}
+
+impl<A, B, C, D, E> Interpolate for (A, B, C, D, E)
+    where A: Interpolate + Clone,
+          B: Interpolate + Clone,
+          C: Interpolate + Clone,
+          D: Interpolate + Clone,
+          E: Interpolate + Clone {
+    fn interpolate(src: &Triangle<(A, B, C, D, E)>, w: [f32; 3]) -> (A, B, C, D, E) {
+        (Interpolate::interpolate(&Triangle::new(src.x.0.clone(), src.y.0.clone(), src.z.0.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.1.clone(), src.y.1.clone(), src.z.1.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.2.clone(), src.y.2.clone(), src.z.2.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.3.clone(), src.y.3.clone(), src.z.3.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.4.clone(), src.y.4.clone(), src.z.4.clone()), w))
+    }
+}
+
+impl<A, B, C, D, E, F> Interpolate for (A, B, C, D, E, F)
+    where A: Interpolate + Clone,
+          B: Interpolate + Clone,
+          C: Interpolate + Clone,
+          D: Interpolate + Clone,
+          E: Interpolate + Clone,
+          F: Interpolate + Clone {
+    fn interpolate(src: &Triangle<(A, B, C, D, E, F)>, w: [f32; 3]) -> (A, B, C, D, E, F) {
+        (Interpolate::interpolate(&Triangle::new(src.x.0.clone(), src.y.0.clone(), src.z.0.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.1.clone(), src.y.1.clone(), src.z.1.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.2.clone(), src.y.2.clone(), src.z.2.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.3.clone(), src.y.3.clone(), src.z.3.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.4.clone(), src.y.4.clone(), src.z.4.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.5.clone(), src.y.5.clone(), src.z.5.clone()), w))
+    }
+}
+
+impl<A, B, C, D, E, F, G> Interpolate for (A, B, C, D, E, F, G)
+    where A: Interpolate + Clone,
+          B: Interpolate + Clone,
+          C: Interpolate + Clone,
+          D: Interpolate + Clone,
+          E: Interpolate + Clone,
+          F: Interpolate + Clone,
+          G: Interpolate + Clone {
+    fn interpolate(src: &Triangle<(A, B, C, D, E, F, G)>, w: [f32; 3]) -> (A, B, C, D, E, F, G) {
+        (Interpolate::interpolate(&Triangle::new(src.x.0.clone(), src.y.0.clone(), src.z.0.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.1.clone(), src.y.1.clone(), src.z.1.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.2.clone(), src.y.2.clone(), src.z.2.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.3.clone(), src.y.3.clone(), src.z.3.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.4.clone(), src.y.4.clone(), src.z.4.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.5.clone(), src.y.5.clone(), src.z.5.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.6.clone(), src.y.6.clone(), src.z.6.clone()), w))
+    }
+}
+
+impl<A, B, C, D, E, F, G, H> Interpolate for (A, B, C, D, E, F, G, H)
+    where A: Interpolate + Clone,
+          B: Interpolate + Clone,
+          C: Interpolate + Clone,
+          D: Interpolate + Clone,
+          E: Interpolate + Clone,
+          F: Interpolate + Clone,
+          G: Interpolate + Clone,
+          H: Interpolate + Clone {
+    fn interpolate(src: &Triangle<(A, B, C, D, E, F, G, H)>, w: [f32; 3]) -> (A, B, C, D, E, F, G, H) {
+        (Interpolate::interpolate(&Triangle::new(src.x.0.clone(), src.y.0.clone(), src.z.0.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.1.clone(), src.y.1.clone(), src.z.1.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.2.clone(), src.y.2.clone(), src.z.2.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.3.clone(), src.y.3.clone(), src.z.3.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.4.clone(), src.y.4.clone(), src.z.4.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.5.clone(), src.y.5.clone(), src.z.5.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.6.clone(), src.y.6.clone(), src.z.6.clone()), w),
+         Interpolate::interpolate(&Triangle::new(src.x.7.clone(), src.y.7.clone(), src.z.7.clone()), w))
     }
 }
