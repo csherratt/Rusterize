@@ -5,7 +5,7 @@ extern crate genmesh;
 extern crate cgmath;
 extern crate rusterize;
 
-use rusterize::Frame;
+use rusterize::{Frame, Flat};
 use cgmath::*;
 use genmesh::generators;
 use genmesh::{Triangulate, MapToVertices};
@@ -173,4 +173,22 @@ fn triangle() {
     });
 
     check("triangle", frame);
+}
+
+#[test]
+fn triangle_flat() {
+    use genmesh::Triangle;
+
+    let triangle = [Triangle::new(
+        ([ -0.5, -0.5, 0., 1., ], Flat([1.0, 0.0, 0.0])),
+        ([  0.5, -0.5, 0., 1., ], Flat([0.0, 1.0, 0.0])),
+        ([  0.0,  0.5, 0., 1., ], Flat([0.0, 0.0, 1.0])),
+    )];
+
+    let mut frame = Frame::new(SIZE, SIZE);
+    frame.raster(triangle.iter().map(|x| *x), |(_, color)| {
+        Rgb([(color[0] * 255.) as u8, (color[1] * 255.) as u8, (color[2] * 255.) as u8])
+    });
+
+    check("triangle_flat", frame);
 }
