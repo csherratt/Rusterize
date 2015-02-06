@@ -32,14 +32,17 @@ impl Frame {
     }
 
     pub fn raster<S, F>(&mut self, poly: S, mut fragment: F)
-        where S: Iterator<Item=Triangle<Vector4<f32>>>,
-              F: FnMut<(f32, f32, f32), Output=Rgb<u8>> {
+        where S: Iterator<Item=Triangle<[f32; 4]>>,
+              F: FnMut<([f32; 4],), Output=Rgb<u8>> {
 
         let h = self.frame.height();
         let w = self.frame.width();
         let (hf, wf) = (h as f32, w as f32);
         let (hh, wh) = (hf/2., wf/2.);
-        for t in poly {
+        for or in poly {
+            let or = or.map_vertex(|v| [v[0] / v[3], v[1] / v[3], v[2] / v[3], v[3] / v[3]]);
+            let t = or.map_vertex(|v| Vector4::new(v[0], v[1], v[2], v[3]));
+
             // cull any backface triangles
             if is_backface(t.map_vertex(|v| Vector3::new(v.x, v.y, v.z))) {
                 continue;
@@ -60,19 +63,9 @@ impl Frame {
             let max_y = clip.x.y.ceil().partial_max(clip.y.y.ceil().partial_max(clip.z.y.ceil())).partial_max(0.).partial_min(wf);
             let min_y = clip.x.y.floor().partial_min(clip.y.y.floor().partial_min(clip.z.y.floor())).partial_max(0.).partial_min(wf);
 
-            let points = clip4.map_vertex(|v| Point3::new(v.x, v.y, v.z));
-            let plane = if let Some(plane) = Plane::from_points(points.x, points.y, points.z) {
-                plane
-            } else {
-                continue;
-            };
-
-            let z_inv = 1. / plane.n.z;
-
             for y in (min_y as u32..max_y as u32) {
                 for x in (min_x as u32..max_x as u32) {
                     let p = Vector2::new(x as f32, y as f32);
-                    let z = (-plane.d - plane.n.x * p.x - plane.n.y * p.y) * z_inv;
                     let &Luma(dz) = self.depth.get_pixel(x, y);
 
                     let v0 = clip.y - clip.x;
@@ -89,12 +82,63 @@ impl Frame {
                     let u = (d11 * d02 - d01 * d12) * inv_denom;
                     let v = (d00 * d12 - d01 * d02) * inv_denom;
 
-                    if z >= 0. && z <= 1. && dz[0] > z && u >= 0. && v >= 0. && (u + v) <= 1. {
-                        self.frame.put_pixel(x, y, fragment(v, 1. - (u+v), u));
+                    let a = v;
+                    let b = (1. - (u+v));
+                    let c = u;
+
+                    let z = a * clip4.x.z + b * clip4.y.z + c * clip4.z.z;
+
+                    if u >= 0. && v >= 0. && (u + v) <= 1. && z >= 0. && z <= 1. && dz[0] > z {
+                        let frag = Interpolate::interpolate(or, [a, b, c]);
+                        self.frame.put_pixel(x, y, fragment(frag));
                         self.depth.put_pixel(x, y, Luma([z]));
                     }
                 }
             }
         }
+    }
+}
+
+pub trait Interpolate {
+    type Out;
+
+    fn interpolate(src: Triangle<Self>, w: [f32; 3]) -> Self::Out;
+}
+
+impl Interpolate for f32 {
+    type Out = f32;
+
+    fn interpolate(src: Triangle<f32>, w: [f32; 3]) -> f32 {
+        src.x * w[0] + src.y * w[1] + src.z * w[2]
+    }
+}
+
+impl Interpolate for [f32; 2] {
+    type Out = [f32; 2];
+
+    fn interpolate(src: Triangle<[f32; 2]>, w: [f32; 3]) -> [f32; 2] {
+        [Interpolate::interpolate(Triangle::new(src.x[0], src.y[0], src.z[0]), w),
+         Interpolate::interpolate(Triangle::new(src.x[1], src.y[1], src.z[1]), w)]
+    }
+}
+
+impl Interpolate for [f32; 3] {
+    type Out = [f32; 3];
+
+    fn interpolate(src: Triangle<[f32; 3]>, w: [f32; 3]) -> [f32; 3] {
+        [Interpolate::interpolate(Triangle::new(src.x[0], src.y[0], src.z[0]), w),
+         Interpolate::interpolate(Triangle::new(src.x[1], src.y[1], src.z[1]), w),
+         Interpolate::interpolate(Triangle::new(src.x[2], src.y[2], src.z[2]), w)]
+    }
+}
+
+impl Interpolate for [f32; 4] {
+    type Out = [f32; 4];
+
+    fn interpolate(src: Triangle<[f32; 4]>, w: [f32; 3]) -> [f32; 4] {
+        [Interpolate::interpolate(Triangle::new(src.x[0], src.y[0], src.z[0]), w),
+         Interpolate::interpolate(Triangle::new(src.x[1], src.y[1], src.z[1]), w),
+         Interpolate::interpolate(Triangle::new(src.x[2], src.y[2], src.z[2]), w),
+         Interpolate::interpolate(Triangle::new(src.x[3], src.y[3], src.z[3]), w)]
     }
 }

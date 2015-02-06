@@ -44,9 +44,9 @@ fn plane_simple() {
     let mut frame = Frame::new(SIZE, SIZE);
     let cube = generators::Plane::new()
         .triangulate()
-        .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 2.).mul_s(0.5)));
+        .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 2.).mul_s(0.5)).into_fixed());
 
-    frame.raster(cube, |_, _, _| {
+    frame.raster(cube, |_| {
         Rgb([255, 255, 255])
     });
 
@@ -58,9 +58,9 @@ fn plane_backface() {
     let mut frame = Frame::new(SIZE, SIZE);
     let cube = generators::Plane::new()
         .triangulate()
-        .vertex(|v| proj().mul_v(&Vector4::new(-v.0, v.1, 0., 2.).mul_s(0.5)));
+        .vertex(|v| proj().mul_v(&Vector4::new(-v.0, v.1, 0., 2.).mul_s(0.5)).into_fixed());
 
-    frame.raster(cube, |_, _, _| {
+    frame.raster(cube, |_| {
         Rgb([255, 255, 255])
     });
 
@@ -72,9 +72,9 @@ fn plane_fill() {
     let mut frame = Frame::new(SIZE, SIZE);
     let cube = generators::Plane::new()
         .triangulate()
-        .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)));
+        .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
 
-    frame.raster(cube, |_, _, _| {
+    frame.raster(cube, |_| {
         Rgb([255, 255, 255])
     });
 
@@ -86,9 +86,9 @@ fn plane_overfill() {
     let mut frame = Frame::new(SIZE, SIZE);
     let cube = generators::Plane::new()
         .triangulate()
-        .vertex(|v| proj().mul_v(&Vector4::new(v.0 * 100., v.1 * 100., 0., 2.)));
+        .vertex(|v| proj().mul_v(&Vector4::new(v.0 * 100., v.1 * 100., 0., 2.)).into_fixed());
 
-    frame.raster(cube, |_, _, _| {
+    frame.raster(cube, |_| {
         Rgb([255, 255, 255])
     });
 
@@ -100,17 +100,17 @@ fn plane_back_front() {
     let mut frame = Frame::new(SIZE, SIZE);
     let cube = generators::Plane::new()
         .triangulate()
-        .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)));
+        .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
 
-    frame.raster(cube, |_, _, _| {
+    frame.raster(cube, |_| {
         Rgb([255, 255, 255])
     });
 
     let cube = generators::Plane::new()
         .triangulate()
-        .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 1., 1.)));
+        .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 1., 1.)).into_fixed());
 
-    frame.raster(cube, |_, _, _| {
+    frame.raster(cube, |_| {
         Rgb([128, 128, 128])
     });
 
@@ -122,17 +122,17 @@ fn plane_front_back() {
     let mut frame = Frame::new(SIZE, SIZE);
     let cube = generators::Plane::new()
         .triangulate()
-        .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 1., 1.)));
+        .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 1., 1.)).into_fixed());
 
-    frame.raster(cube, |_, _, _| {
+    frame.raster(cube, |_| {
         Rgb([255, 255, 255])
     });
 
     let cube = generators::Plane::new()
         .triangulate()
-        .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)));
+        .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
 
-    frame.raster(cube, |_, _, _| {
+    frame.raster(cube, |_| {
         Rgb([128, 128, 128])
     });
 
@@ -148,10 +148,10 @@ fn cube() {
     let mut frame = Frame::new(SIZE, SIZE);
     let cube = generators::Cube::new()
         .triangulate()
-        .vertex(|v| proj().mul_v(&rot.mul_v(&Vector4::new(v.0 * 0.5, v.1 * 0.5, v.2 * 0.5, 1.))));
+        .vertex(|v| proj().mul_v(&rot.mul_v(&Vector4::new(v.0 * 0.5, v.1 * 0.5, v.2 * 0.5, 1.))).into_fixed());
 
-    frame.raster(cube, |a, b, c| {
-        Rgb([(a * 255.) as u8, (b * 255.) as u8, (c * 255.) as u8])
+    frame.raster(cube, |a| {
+        Rgb([64, 64, 64])
     });
 
     check("cube", frame);
