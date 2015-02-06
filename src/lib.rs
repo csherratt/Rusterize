@@ -69,7 +69,7 @@ impl Frame {
             for y in (min_y as u32..max_y as u32) {
                 for x in (min_x as u32..max_x as u32) {
                     let p = Vector2::new(x as f32, y as f32);
-                    let &Luma(dz) = self.depth.get_pixel(x, y);
+                    let &Luma(dz) = self.depth.get_pixel(x, h-y-1);
 
                     let v0 = clip.y - clip.x;
                     let v1 = clip.z - clip.x;
@@ -85,16 +85,16 @@ impl Frame {
                     let u = (d11 * d02 - d01 * d12) * inv_denom;
                     let v = (d00 * d12 - d01 * d02) * inv_denom;
 
-                    let a = v;
-                    let b = (1. - (u+v));
-                    let c = u;
+                    let a = (1. - (u+v));
+                    let b = u;
+                    let c = v;
 
                     let z = a * clip4.x.z + b * clip4.y.z + c * clip4.z.z;
 
                     if u >= 0. && v >= 0. && (u + v) <= 1. && z >= 0. && z <= 1. && dz[0] > z {
                         let frag = Interpolate::interpolate(&or, [a, b, c]);
-                        self.frame.put_pixel(x, y, fragment(frag));
-                        self.depth.put_pixel(x, y, Luma([z]));
+                        self.frame.put_pixel(x, h-y-1, fragment(frag));
+                        self.depth.put_pixel(x, h-y-1, Luma([z]));
                     }
                 }
             }

@@ -156,3 +156,21 @@ fn cube() {
 
     check("cube", frame);
 }
+
+#[test]
+fn triangle() {
+    use genmesh::Triangle;
+
+    let triangle = [Triangle::new(
+        ([ -0.5, -0.5, 0., 1., ], [1.0, 0.0, 0.0]),
+        ([  0.5, -0.5, 0., 1., ], [0.0, 1.0, 0.0]),
+        ([  0.0,  0.5, 0., 1., ], [0.0, 0.0, 1.0]),
+    )];
+
+    let mut frame = Frame::new(SIZE, SIZE);
+    frame.raster(triangle.iter().map(|x| *x), |(_, color)| {
+        Rgb([(color[0] * 255.) as u8, (color[1] * 255.) as u8, (color[2] * 255.) as u8])
+    });
+
+    check("triangle", frame);
+}
