@@ -22,7 +22,7 @@ fn plane_simple(bench: &mut Bencher) {
         let plane = generators::Plane::new();
         frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
-            |a, b, c| { Rgb([a as u8, b as u8, c as u8]) }
+            |_| { Rgb([255, 255, 255]) }
         );
     });
 }
@@ -35,7 +35,7 @@ fn plane_subdivide(bench: &mut Bencher) {
         let plane = generators::Plane::subdivide(128, 128);
         frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
-            |a, b, c| { Rgb([a as u8, b as u8, c as u8]) }
+            |_| { Rgb([255, 255, 255]) }
         );
     });
 }
@@ -48,7 +48,7 @@ fn plane_backface(bench: &mut Bencher) {
         let plane = generators::Plane::new();
         frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(-v.0, v.1, 0., 1.).into_fixed()),
-            |a, b, c| { Rgb([a as u8, b as u8, c as u8]) }
+            |_| { Rgb([255, 255, 255]) }
         );
     });
 }
@@ -61,11 +61,11 @@ fn plane_front_back(bench: &mut Bencher) {
         let plane = generators::Plane::new();
         frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 1., 1.).into_fixed()),
-            |_, _, _| { Rgb([255, 255, 255]) }
+            |_| { Rgb([255, 255, 255]) }
         );
         frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
-            |_, _, _| { Rgb([255, 255, 255]) }
+            |_| { Rgb([255, 255, 255]) }
         );
     });
 }
@@ -78,11 +78,11 @@ fn plane_back_front(bench: &mut Bencher) {
         let plane = generators::Plane::new();
         frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
-            |_, _, _| { Rgb([255, 255, 255]) }
+            |_| { Rgb([255, 255, 255]) }
         );
         frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 1., 1.).into_fixed()),
-            |_, _, _| { Rgb([255, 255, 255]) }
+            |_| { Rgb([255, 255, 255]) }
         );
     });
 }

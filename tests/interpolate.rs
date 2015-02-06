@@ -16,17 +16,17 @@ fn test_f32() {
     let s010 = [0., 1., 0.];
     let s100 = [1., 0., 0.];
 
-    assert_eq!(Interpolate::interpolate(v001, s001), 1.);
-    assert_eq!(Interpolate::interpolate(v001, s010), 0.);
-    assert_eq!(Interpolate::interpolate(v001, s100), 0.);
+    assert_eq!(Interpolate::interpolate(&v001, s001), 1.);
+    assert_eq!(Interpolate::interpolate(&v001, s010), 0.);
+    assert_eq!(Interpolate::interpolate(&v001, s100), 0.);
 
-    assert_eq!(Interpolate::interpolate(v010, s001), 0.);
-    assert_eq!(Interpolate::interpolate(v010, s010), 1.);
-    assert_eq!(Interpolate::interpolate(v010, s100), 0.);
+    assert_eq!(Interpolate::interpolate(&v010, s001), 0.);
+    assert_eq!(Interpolate::interpolate(&v010, s010), 1.);
+    assert_eq!(Interpolate::interpolate(&v010, s100), 0.);
 
-    assert_eq!(Interpolate::interpolate(v100, s001), 0.);
-    assert_eq!(Interpolate::interpolate(v100, s010), 0.);
-    assert_eq!(Interpolate::interpolate(v100, s100), 1.);
+    assert_eq!(Interpolate::interpolate(&v100, s001), 0.);
+    assert_eq!(Interpolate::interpolate(&v100, s010), 0.);
+    assert_eq!(Interpolate::interpolate(&v100, s100), 1.);
 }
 
 #[test]
@@ -39,17 +39,17 @@ fn test_f32_2() {
     let s010 = [0., 1., 0.];
     let s100 = [1., 0., 0.];
 
-    assert_eq!(Interpolate::interpolate(v001, s001), [1., 1.]);
-    assert_eq!(Interpolate::interpolate(v001, s010), [0., 0.]);
-    assert_eq!(Interpolate::interpolate(v001, s100), [0., 0.]);
+    assert_eq!(Interpolate::interpolate(&v001, s001), [1., 1.]);
+    assert_eq!(Interpolate::interpolate(&v001, s010), [0., 0.]);
+    assert_eq!(Interpolate::interpolate(&v001, s100), [0., 0.]);
 
-    assert_eq!(Interpolate::interpolate(v010, s001), [0., 0.]);
-    assert_eq!(Interpolate::interpolate(v010, s010), [1., 1.]);
-    assert_eq!(Interpolate::interpolate(v010, s100), [0., 0.]);
+    assert_eq!(Interpolate::interpolate(&v010, s001), [0., 0.]);
+    assert_eq!(Interpolate::interpolate(&v010, s010), [1., 1.]);
+    assert_eq!(Interpolate::interpolate(&v010, s100), [0., 0.]);
 
-    assert_eq!(Interpolate::interpolate(v100, s001), [0., 0.]);
-    assert_eq!(Interpolate::interpolate(v100, s010), [0., 0.]);
-    assert_eq!(Interpolate::interpolate(v100, s100), [1., 1.]);
+    assert_eq!(Interpolate::interpolate(&v100, s001), [0., 0.]);
+    assert_eq!(Interpolate::interpolate(&v100, s010), [0., 0.]);
+    assert_eq!(Interpolate::interpolate(&v100, s100), [1., 1.]);
 }
 
 
@@ -63,17 +63,17 @@ fn test_f32_3() {
     let s010 = [0., 1., 0.];
     let s100 = [1., 0., 0.];
 
-    assert_eq!(Interpolate::interpolate(v001, s001), [1., 1., 1.]);
-    assert_eq!(Interpolate::interpolate(v001, s010), [0., 0., 0.]);
-    assert_eq!(Interpolate::interpolate(v001, s100), [0., 0., 0.]);
+    assert_eq!(Interpolate::interpolate(&v001, s001), [1., 1., 1.]);
+    assert_eq!(Interpolate::interpolate(&v001, s010), [0., 0., 0.]);
+    assert_eq!(Interpolate::interpolate(&v001, s100), [0., 0., 0.]);
 
-    assert_eq!(Interpolate::interpolate(v010, s001), [0., 0., 0.]);
-    assert_eq!(Interpolate::interpolate(v010, s010), [1., 1., 1.]);
-    assert_eq!(Interpolate::interpolate(v010, s100), [0., 0., 0.]);
+    assert_eq!(Interpolate::interpolate(&v010, s001), [0., 0., 0.]);
+    assert_eq!(Interpolate::interpolate(&v010, s010), [1., 1., 1.]);
+    assert_eq!(Interpolate::interpolate(&v010, s100), [0., 0., 0.]);
 
-    assert_eq!(Interpolate::interpolate(v100, s001), [0., 0., 0.]);
-    assert_eq!(Interpolate::interpolate(v100, s010), [0., 0., 0.]);
-    assert_eq!(Interpolate::interpolate(v100, s100), [1., 1., 1.]);
+    assert_eq!(Interpolate::interpolate(&v100, s001), [0., 0., 0.]);
+    assert_eq!(Interpolate::interpolate(&v100, s010), [0., 0., 0.]);
+    assert_eq!(Interpolate::interpolate(&v100, s100), [1., 1., 1.]);
 }
 
 #[test]
@@ -86,15 +86,15 @@ fn test_f32_4() {
     let s010 = [0., 1., 0.];
     let s100 = [1., 0., 0.];
 
-    assert_eq!(Interpolate::interpolate(v001, s001), [1., 1., 1., 1.]);
-    assert_eq!(Interpolate::interpolate(v001, s010), [0., 0., 0., 0.]);
-    assert_eq!(Interpolate::interpolate(v001, s100), [0., 0., 0., 0.]);
+    assert_eq!(Interpolate::interpolate(&v001, s001), [1., 1., 1., 1.]);
+    assert_eq!(Interpolate::interpolate(&v001, s010), [0., 0., 0., 0.]);
+    assert_eq!(Interpolate::interpolate(&v001, s100), [0., 0., 0., 0.]);
 
-    assert_eq!(Interpolate::interpolate(v010, s001), [0., 0., 0., 0.]);
-    assert_eq!(Interpolate::interpolate(v010, s010), [1., 1., 1., 1.]);
-    assert_eq!(Interpolate::interpolate(v010, s100), [0., 0., 0., 0.]);
+    assert_eq!(Interpolate::interpolate(&v010, s001), [0., 0., 0., 0.]);
+    assert_eq!(Interpolate::interpolate(&v010, s010), [1., 1., 1., 1.]);
+    assert_eq!(Interpolate::interpolate(&v010, s100), [0., 0., 0., 0.]);
 
-    assert_eq!(Interpolate::interpolate(v100, s001), [0., 0., 0., 0.]);
-    assert_eq!(Interpolate::interpolate(v100, s010), [0., 0., 0., 0.]);
-    assert_eq!(Interpolate::interpolate(v100, s100), [1., 1., 1., 1.]);
+    assert_eq!(Interpolate::interpolate(&v100, s001), [0., 0., 0., 0.]);
+    assert_eq!(Interpolate::interpolate(&v100, s010), [0., 0., 0., 0.]);
+    assert_eq!(Interpolate::interpolate(&v100, s100), [1., 1., 1., 1.]);
 }
