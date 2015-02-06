@@ -1,4 +1,4 @@
-#![feature(unboxed_closures)]
+#![feature(unboxed_closures, core)]
 
 extern crate image;
 extern crate genmesh;
@@ -85,7 +85,7 @@ impl Frame {
                     let u = (d11 * d02 - d01 * d12) * inv_denom;
                     let v = (d00 * d12 - d01 * d02) * inv_denom;
 
-                    let a = (1. - (u+v));
+                    let a = 1. - (u+v);
                     let b = u;
                     let c = v;
 
@@ -144,7 +144,7 @@ pub struct Flat<T>(pub T);
 
 impl<T: Clone> Interpolate for Flat<T> {
     type Out = T;
-    fn interpolate(src: &Triangle<Flat<T>>, w: [f32; 3]) -> T { src.x.0.clone() }
+    fn interpolate(src: &Triangle<Flat<T>>, _: [f32; 3]) -> T { src.x.0.clone() }
 }
 
 pub trait Interpolate {

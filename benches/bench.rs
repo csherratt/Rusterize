@@ -1,3 +1,5 @@
+#![feature(test)]
+
 extern crate image;
 extern crate genmesh;
 extern crate cgmath;
@@ -8,8 +10,7 @@ use rusterize::Frame;
 use cgmath::*;
 use genmesh::generators;
 use genmesh::{Triangulate, MapToVertices};
-use std::old_io::File;
-use test::{Bencher, black_box};
+use test::Bencher;
 use image::Rgb;
 
 const SIZE: u32 = 1024;

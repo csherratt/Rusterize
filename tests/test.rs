@@ -1,4 +1,4 @@
-#![feature(path, io)]
+#![feature(path, io, core)]
 
 extern crate image;
 extern crate genmesh;
@@ -150,7 +150,7 @@ fn cube() {
         .triangulate()
         .vertex(|v| proj().mul_v(&rot.mul_v(&Vector4::new(v.0 * 0.5, v.1 * 0.5, v.2 * 0.5, 1.))).into_fixed());
 
-    frame.raster(cube, |a| {
+    frame.raster(cube, |_| {
         Rgb([64, 64, 64])
     });
 

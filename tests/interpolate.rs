@@ -1,4 +1,3 @@
-#![feature(path, io)]
 
 extern crate rusterize;
 extern crate genmesh;
