@@ -100,7 +100,7 @@ impl Frame {
 
                     let z = a * clip4.x.z + b * clip4.y.z + c * clip4.z.z;
 
-                    if u >= 0. && v >= 0. && (u + v) <= 1. && dz[0] > z {
+                    if u >= 0. && v >= 0. && (u + v) <= 1. && z >= -1. && dz[0] > z {
                         let frag = Interpolate::interpolate(&or, [a, b, c]);
                         self.frame.put_pixel(x, h-y-1, fragment(frag));
                         self.depth.put_pixel(x, h-y-1, Luma([z]));
