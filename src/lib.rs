@@ -169,6 +169,76 @@ impl Frame {
             }
         }
     }
+
+    /// This is an extramly slow render that is designed to find missing fragments.
+    pub fn debug_raster<S, F, T, O>(&mut self, poly: S, mut fragment: F)
+        where S: Iterator<Item=Triangle<T>>,
+              F: FnMut<(O,), Output=Rgb<u8>>,
+              T: FetchPosition + Clone + Interpolate<Out=O> {
+        let h = self.frame.height();
+        let w = self.frame.width();
+        let (hf, wf) = (h as f32, w as f32);
+        let (hh, wh) = (hf/2., wf/2.);
+        for or in poly {
+            let t = or.clone().map_vertex(|v| {
+                let v = v.position();
+                Vector4::new(v[0], v[1], v[2], v[3])
+            });
+
+            // cull any backface triangles
+            if is_backface(t.map_vertex(|v| Vector3::new(v.x, v.y, v.z))) {
+                continue;
+            }
+
+            let clip4 = t.map_vertex(|v| {
+                Vector4::new(
+                    hh * (v.x / v.w) + hh,
+                    wh * (v.y / v.w) + wh,
+                    v.z / v.w,
+                    v.w / v.w
+                )
+            });
+            let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
+
+            let mut raster = |x: u32, y: u32| {
+                if x >= w || x  < 0 || y >= h || y < 0 { return } 
+                let p = Vector2::new(x as f32, y as f32);
+                let &Luma(dz) = self.depth.get_pixel(x, h-y-1);
+
+                let v0 = clip.y - clip.x;
+                let v1 = clip.z - clip.x;
+                let v2 = p - clip.x;
+
+                let d00 = v0.dot(&v0);
+                let d01 = v0.dot(&v1);
+                let d02 = v0.dot(&v2);
+                let d11 = v1.dot(&v1);
+                let d12 = v1.dot(&v2);
+
+                let inv_denom = 1. / (d00 * d11 - d01 * d01);
+                let u = (d11 * d02 - d01 * d12) * inv_denom;
+                let v = (d00 * d12 - d01 * d02) * inv_denom;
+
+                let a = 1. - (u+v);
+                let b = u;
+                let c = v;
+
+                let z = a * clip4.x.z + b * clip4.y.z + c * clip4.z.z;
+
+                if u >= 0. && v >= 0. && (u + v) <= 1. && z >= -1. && dz[0] > z {
+                    let frag = Interpolate::interpolate(&or, [a, b, c]);
+                    self.frame.put_pixel(x, h-y-1, fragment(frag));
+                    self.depth.put_pixel(x, h-y-1, Luma([z]));
+                }
+            };
+
+            for y in 0..h {
+                for x in 0..w {
+                    raster(x, y);
+                }
+            }
+        }
+    }
 }
 
 
