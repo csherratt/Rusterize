@@ -21,6 +21,7 @@ fn plane_simple(bench: &mut Bencher) {
     let mut frame = Frame::new(SIZE, SIZE);
 
     bench.iter(|| {
+        frame.clear();
         let plane = generators::Plane::new();
         frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
@@ -34,6 +35,7 @@ fn plane_subdivide(bench: &mut Bencher) {
     let mut frame = Frame::new(SIZE, SIZE);
 
     bench.iter(|| {
+        frame.clear();
         let plane = generators::Plane::subdivide(128, 128);
         frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
@@ -47,6 +49,7 @@ fn plane_backface(bench: &mut Bencher) {
     let mut frame = Frame::new(SIZE, SIZE);
 
     bench.iter(|| {
+        frame.clear();
         let plane = generators::Plane::new();
         frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(-v.0, v.1, 0., 1.).into_fixed()),
@@ -60,6 +63,7 @@ fn plane_front_back(bench: &mut Bencher) {
     let mut frame = Frame::new(SIZE, SIZE);
 
     bench.iter(|| {
+        frame.clear();
         let plane = generators::Plane::new();
         frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 1., 1.).into_fixed()),
@@ -77,6 +81,7 @@ fn plane_back_front(bench: &mut Bencher) {
     let mut frame = Frame::new(SIZE, SIZE);
 
     bench.iter(|| {
+        frame.clear();
         let plane = generators::Plane::new();
         frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
@@ -99,18 +104,26 @@ fn monkey(bench: &mut Bencher) {
     let light_normal = Vector4::new(10., 10., 10., 0.).normalize();
     let kd = Vector4::new(64., 128., 64., 1.);
     let ka = Vector4::new(16., 16., 16., 1.);
+    let mut frame = Frame::new(SIZE, SIZE);
 
     bench.iter(|| {
+        frame.clear();
         let vertex = monkey.indices().iter().map(|x| *x)
                            .vertex(|(p, _, n)| { (obj.position()[p], obj.normal()[n.unwrap()]) })
                            .vertex(|(p, n)| (proj.mul_v(&Vector4::new(p[0], p[1], p[2], 1.)).into_fixed(), n))
                            .triangulate();
 
-        let mut frame = Frame::new(SIZE, SIZE);
         frame.raster(vertex, |(_, n)| {
             let normal = Vector4::new(n[0], n[1], n[2], 0.);
             let v = kd.mul_s(light_normal.dot(&normal).partial_max(0.))  + ka;
             Rgb([v.x as u8, v.y as u8, v.z as u8])
         });
     });
+}
+
+#[bench]
+fn buffer_clear(bench: &mut Bencher) {
+    let mut frame = Frame::new(SIZE, SIZE);
+
+    bench.iter(|| { frame.clear(); });
 }
