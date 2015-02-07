@@ -31,6 +31,15 @@ impl Frame {
         }
     }
 
+    pub fn clear(&mut self) {
+        for pixel in self.frame.as_mut_slice().iter_mut() {
+            *pixel = 0;
+        }
+        for depth in self.depth.as_mut_slice().iter_mut() {
+            *depth = 1.;
+        }
+    }
+
     pub fn raster<S, F, T, O>(&mut self, poly: S, mut fragment: F)
         where S: Iterator<Item=Triangle<T>>,
               F: FnMut<(O,), Output=Rgb<u8>>,

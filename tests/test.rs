@@ -219,3 +219,17 @@ fn monkey() {
     });
     check("monkey", frame);
 }
+
+#[test]
+fn buffer_clear() {
+    let mut frame = Frame::new(SIZE, SIZE);
+    let cube = generators::Plane::new()
+        .triangulate()
+        .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
+
+    frame.raster(cube, |_| {
+        Rgb([255, 255, 255])
+    });
+    frame.clear();
+    check("buffer_clear", frame);
+}
