@@ -10,3 +10,6 @@ cgmath = "*"
 
 [dependencies.image]
 git = "https://github.com/PistonDevelopers/image"
+
+[dev-dependencies]
+obj = "*"
