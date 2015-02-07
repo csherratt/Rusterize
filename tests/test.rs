@@ -142,17 +142,38 @@ fn plane_front_back() {
 
 #[test]
 fn cube() {
+    use genmesh::Triangle;
+
     let angle = deg(45.).to_rad();
     let rot: Quaternion<f32> = Rotation3::from_euler(angle, angle, rad(0.));
     let rot = rot.to_matrix4();
 
+    let triangle = [
+        [255.0, 0.0, 0.0],
+        [0.0, 255.0, 0.0],
+        [0.0, 0.0, 255.0],
+        [255.0, 255.0, 0.0],
+        [0.0, 255.0, 255.0],
+        [255.0, 0.0, 255.0],
+    ];
+    let mut i = 0;
+
     let mut frame = Frame::new(SIZE, SIZE);
     let cube = generators::Cube::new()
         .triangulate()
-        .vertex(|v| proj().mul_v(&rot.mul_v(&Vector4::new(v.0 * 0.5, v.1 * 0.5, v.2 * 0.5, 1.))).into_fixed());
+        .vertex(|v| proj().mul_v(&rot.mul_v(&Vector4::new(v.0 * 0.5, v.1 * 0.5, v.2 * 0.5, 1.))).into_fixed())
+        .map(|p| {
+            let color = triangle[i % 6];
+            i += 1;
+            Triangle::new(
+                (p.x, color),
+                (p.y, color),
+                (p.z, color)
+            )
+        });
 
-    frame.raster(cube, |_| {
-        Rgb([64, 64, 64])
+    frame.raster(cube, |(_, color)| {
+        Rgb([color[0] as u8, color[1] as u8, color[2] as u8])
     });
 
     check("cube", frame);
