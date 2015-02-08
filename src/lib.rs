@@ -47,6 +47,49 @@ fn scanline<F>(y: u32, s: f32, e: f32, fragment: &mut F) where F: FnMut<(u32, u3
     }
 }
 
+/// described a scanline
+#[derive(Debug, Copy, PartialEq, Eq)]
+pub struct Scanline {
+    pub start: i32,
+    pub end: i32
+}
+
+pub type ScanlineIter = std::ops::Range<i32>;
+
+impl Scanline {
+    /// create a new scanline between two points, a & b
+    /// this is inclusive, so if a == b one point is valid
+    pub fn new(a: i32, b: i32) -> Scanline {
+        if a > b {
+            Scanline { start: b, end: a }
+        } else {
+            Scanline { start: a, end: b }
+        }
+    }
+
+    /// limit, limit a scanline between to points
+    /// min and max are inclusive. If a screen buffer is 64 pixels wide
+    /// you will need to call `limit(0, 63)` for example.
+    pub fn limit(self, min: i32, max: i32) -> Scanline {
+        use std::cmp;
+        let start = cmp::min(cmp::max(self.start, min), max);
+        let end = cmp::min(cmp::max(self.end, min), max);
+        Scanline {
+            start: start,
+            end: end
+        }
+    }
+
+    /// create an ScanlineIter from 
+    pub fn iter(self) -> ScanlineIter { self.start..(self.end+1) }
+}
+
+#[derive(Debug)]
+pub struct RasterTriangle {
+    bottom: TriangleBottomIter,
+    top: FlatTopIter
+}
+
 fn fill_bottom<F>(a: Triangle<Vector2<f32>>, fragment: &mut F) where F: FnMut<(u32, u32)> {
     use std::mem::swap;
     let inv_slope_0 = (a.y.x - a.x.x) / (a.y.y - a.x.y);
@@ -74,6 +117,64 @@ fn fill_top<F>(a: Triangle<Vector2<f32>>, fragment: &mut F) where F: FnMut<(u32,
         curx0 -= inv_slope_0;
         curx1 -= inv_slope_1;
         scanline(y, curx0, curx1, fragment);
+    }
+}
+
+impl RasterTriangle {
+    pub fn new(a: Triangle<Vector2<f32>>) -> RasterTriangle {
+        RasterTriangle {
+            bottom: TriangleBottomIter::new(a),
+            top: FlatTopIter::new(a),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct TriangleBottomIter {
+    range: ScanlineIter,
+    slope: [f32; 2],
+    cursor: [f32; 2]
+}
+
+impl TriangleBottomIter {
+    pub fn new(a: Triangle<Vector2<f32>>) -> TriangleBottomIter {
+        TriangleBottomIter {
+            range: Scanline::new(a.x.y.floor() as i32, a.y.y.ceil() as i32).iter(),
+            slope: [(a.y.x - a.x.x) / (a.y.y - a.x.y),
+                    (a.z.x - a.x.x) / (a.z.y - a.x.y)],
+            cursor: [a.x.x, a.y.x]
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct FlatTopIter {
+    range: ScanlineIter,
+    slope: [f32; 2],
+    cursor: [f32; 2]
+}
+
+impl FlatTopIter {
+    pub fn new(a: Triangle<Vector2<f32>>) -> FlatTopIter {
+        FlatTopIter {
+            range: Scanline::new(a.x.y.floor() as i32, a.z.y.ceil() as i32).iter(),
+            slope: [(a.z.x - a.x.x) / (a.z.y - a.x.y),
+                    (a.y.x - a.z.x) / (a.y.y - a.z.y)],
+            cursor: [a.x.x, a.y.x]
+        }
+    }
+}
+
+impl Iterator for FlatTopIter {
+    type Item = (i32, Scanline);
+    fn next(&mut self) -> Option<(i32, Scanline)> {
+        self.range.next().map(|y| {
+            println!("{:?} {:?}", self.slope, self.cursor);
+            let res = (y, Scanline::new(self.cursor[0] as i32, self.cursor[1] as i32));
+            self.cursor[0] += self.slope[0];
+            self.cursor[1] += self.slope[1];
+            res
+        })
     }
 }
 

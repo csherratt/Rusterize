@@ -17,8 +17,8 @@ const SIZE: u32 = 64;
 
 fn check(name: &str, frame: Frame) {
     // Save the image output just incase the test fails
-    let fout = File::create(&Path::new("test_data/results").join(format!("{}.frame.png", name))).unwrap();
-    let _= image::ImageRgb8(frame.frame.clone()).save(fout, image::PNG);
+    let mut fout = File::create(&Path::new("test_data/results").join(format!("{}.frame.png", name))).unwrap();
+    let _= image::ImageRgb8(frame.frame.clone()).save(&mut fout, image::PNG);
 
     let (width, height) = frame.depth.dimensions();
     let mut out = ImageBuffer::new(width, height);
@@ -29,8 +29,8 @@ fn check(name: &str, frame: Frame) {
         }
     }
 
-    let fout = File::create(&Path::new("test_data/results").join(format!("{}.depth.png", name))).unwrap();
-    let _= image::ImageLuma8(out).save(fout, image::PNG);
+    let mut fout = File::create(&Path::new("test_data/results").join(format!("{}.depth.png", name))).unwrap();
+    let _= image::ImageLuma8(out).save(&mut fout, image::PNG);
 
     let expected = image::open(&Path::new("test_data/expected").join(format!("{}.frame.png", name))).unwrap();
     assert!(expected.raw_pixels() == frame.frame.as_slice());
