@@ -86,8 +86,8 @@ impl Scanline {
 
 #[derive(Debug)]
 pub struct RasterTriangle {
-    bottom: TriangleBottomIter,
-    top: FlatTopIter
+    bottom: FlatTriangleIter,
+    top: FlatTriangleIter
 }
 
 fn fill_bottom<F>(a: Triangle<Vector2<f32>>, fragment: &mut F) where F: FnMut<(u32, u32)> {
@@ -121,55 +121,60 @@ fn fill_top<F>(a: Triangle<Vector2<f32>>, fragment: &mut F) where F: FnMut<(u32,
 }
 
 impl RasterTriangle {
-    pub fn new(a: Triangle<Vector2<f32>>) -> RasterTriangle {
+    pub fn new(mut a: Triangle<Vector2<f32>>) -> RasterTriangle {
+        sort_vertex_y(&mut a);
+        let v = Vector2::new(a.x.x + ((a.y.y - a.x.y) / (a.z.y - a.x.y)) * (a.z.x - a.x.x),
+                             a.y.y);
+   
         RasterTriangle {
-            bottom: TriangleBottomIter::new(a),
-            top: FlatTopIter::new(a),
+            bottom: FlatTriangleIter::new_bottom(Triangle::new(a.x, a.y, v)),
+            top: FlatTriangleIter::new_top(Triangle::new(a.y, v, a.z)),
         }
     }
 }
 
+impl Iterator for RasterTriangle {
+    type Item = (i32, Scanline);
+
+    fn next(&mut self) -> Option<(i32, Scanline)> {
+        if let Some(x) = self.bottom.next() {
+            return Some(x);
+        }
+        self.top.next()
+    }
+}
+
 #[derive(Debug)]
-pub struct TriangleBottomIter {
+pub struct FlatTriangleIter {
     range: ScanlineIter,
     slope: [f32; 2],
     cursor: [f32; 2]
 }
 
-impl TriangleBottomIter {
-    pub fn new(a: Triangle<Vector2<f32>>) -> TriangleBottomIter {
-        TriangleBottomIter {
-            range: Scanline::new(a.x.y.floor() as i32, a.y.y.ceil() as i32).iter(),
-            slope: [(a.y.x - a.x.x) / (a.y.y - a.x.y),
-                    (a.z.x - a.x.x) / (a.z.y - a.x.y)],
-            cursor: [a.x.x, a.y.x]
+impl FlatTriangleIter {
+    pub fn new_bottom(a: Triangle<Vector2<f32>>) -> FlatTriangleIter {
+        FlatTriangleIter {
+            range: Scanline::new(a.x.y.floor() as i32, a.z.y.ceil() as i32).iter(),
+            slope: [(a.x.x - a.y.x) / (a.x.y - a.y.y),
+                    (a.x.x - a.z.x) / (a.x.y - a.z.y)],
+            cursor: [a.x.x, a.x.x]
         }
     }
-}
 
-#[derive(Debug)]
-pub struct FlatTopIter {
-    range: ScanlineIter,
-    slope: [f32; 2],
-    cursor: [f32; 2]
-}
-
-impl FlatTopIter {
-    pub fn new(a: Triangle<Vector2<f32>>) -> FlatTopIter {
-        FlatTopIter {
+    pub fn new_top(a: Triangle<Vector2<f32>>) -> FlatTriangleIter {
+        FlatTriangleIter {
             range: Scanline::new(a.x.y.floor() as i32, a.z.y.ceil() as i32).iter(),
             slope: [(a.z.x - a.x.x) / (a.z.y - a.x.y),
-                    (a.y.x - a.z.x) / (a.y.y - a.z.y)],
+                    (a.z.x - a.y.x) / (a.z.y - a.y.y)],
             cursor: [a.x.x, a.y.x]
         }
     }
 }
 
-impl Iterator for FlatTopIter {
+impl Iterator for FlatTriangleIter {
     type Item = (i32, Scanline);
     fn next(&mut self) -> Option<(i32, Scanline)> {
         self.range.next().map(|y| {
-            println!("{:?} {:?}", self.slope, self.cursor);
             let res = (y, Scanline::new(self.cursor[0] as i32, self.cursor[1] as i32));
             self.cursor[0] += self.slope[0];
             self.cursor[1] += self.slope[1];
@@ -259,14 +264,10 @@ impl Frame {
                 }
             };
 
-            if sc.y.y == sc.z.y {
-                fill_bottom(sc, &mut raster);
-            } else if sc.x.y == sc.y.y {
-                fill_top(sc, &mut raster);
-            } else {
-                let v = Vector2::new(sc.x.x + ((sc.y.y - sc.x.y) / (sc.z.y - sc.x.y)) * (sc.z.x - sc.x.x), sc.y.y);
-                fill_bottom(Triangle::new(sc.x, sc.y, v), &mut raster);
-                fill_top(Triangle::new(sc.y, v, sc.z), &mut raster);
+            for (y, line) in RasterTriangle::new(clip) {
+                for x in line.iter() {
+                    raster(x as u32, y as u32);
+                }
             }
         }
     }
