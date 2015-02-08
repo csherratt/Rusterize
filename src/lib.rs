@@ -10,6 +10,14 @@ use genmesh::{Triangle, MapVertex};
 use std::num::Float;
 use std::ops::Range;
 
+#[cfg(dump)]
+fn dump(idx: usize, frame: &Frame) {
+    use std::old_io::File;
+    // Save the image output just incase the test fails
+    let mut fout = File::create(&Path::new("dump").join(format!("{:05}.png", idx))).unwrap();
+    let _= image::ImageRgb8(frame.frame.clone()).save(&mut fout, image::PNG);
+}
+
 #[derive(Clone)]
 pub struct Frame {
     pub frame: ImageBuffer<Rgb<u8>, Vec<u8>>,
@@ -148,25 +156,40 @@ impl Iterator for RasterTriangle {
 pub struct FlatTriangleIter {
     range: ScanlineIter,
     slope: [f32; 2],
-    cursor: [f32; 2]
+    cursor: [f32; 2],
+    base: [f32; 2]
 }
 
 impl FlatTriangleIter {
-    pub fn new_bottom(a: Triangle<Vector2<f32>>) -> FlatTriangleIter {
+    pub fn new_bottom(mut a: Triangle<Vector2<f32>>) -> FlatTriangleIter {
+        use std::mem::swap;
+
+        if a.y.x > a.z.x {
+            swap(&mut a.y, &mut a.z);
+        }
+
         FlatTriangleIter {
-            range: Scanline::new(a.x.y.floor() as i32, a.z.y.ceil() as i32).iter(),
+            range: Scanline::new(a.x.y.round() as i32, a.z.y.ceil() as i32).iter(),
             slope: [(a.x.x - a.y.x) / (a.x.y - a.y.y),
                     (a.x.x - a.z.x) / (a.x.y - a.z.y)],
-            cursor: [a.x.x, a.x.x]
+            cursor: [a.x.x, a.x.x],
+            base: [a.x.y, a.x.y]
         }
     }
 
-    pub fn new_top(a: Triangle<Vector2<f32>>) -> FlatTriangleIter {
+    pub fn new_top(mut a: Triangle<Vector2<f32>>) -> FlatTriangleIter {
+        use std::mem::swap;
+
+        if a.x.x > a.y.x {
+            swap(&mut a.x, &mut a.y);
+        }
+
         FlatTriangleIter {
-            range: Scanline::new(a.x.y.floor() as i32, a.z.y.ceil() as i32).iter(),
+            range: Scanline::new(a.x.y.round() as i32, a.z.y.ceil() as i32).iter(),
             slope: [(a.z.x - a.x.x) / (a.z.y - a.x.y),
                     (a.z.x - a.y.x) / (a.z.y - a.y.y)],
-            cursor: [a.x.x, a.y.x]
+            cursor: [a.x.x, a.y.x],
+            base: [a.y.y, a.y.y]
         }
     }
 }
@@ -175,10 +198,10 @@ impl Iterator for FlatTriangleIter {
     type Item = (i32, Scanline);
     fn next(&mut self) -> Option<(i32, Scanline)> {
         self.range.next().map(|y| {
-            let res = (y, Scanline::new(self.cursor[0] as i32, self.cursor[1] as i32));
-            self.cursor[0] += self.slope[0];
-            self.cursor[1] += self.slope[1];
-            res
+            let yf = y as f32;
+            let s = (yf - self.base[0]) * self.slope[0] + self.cursor[0];
+            let e = (yf - self.base[1]) * self.slope[1] + self.cursor[1];
+            (y, Scanline::new(s as i32, e as i32))
         })
     }
 }
@@ -203,13 +226,13 @@ impl Frame {
     pub fn raster<S, F, T, O>(&mut self, poly: S, mut fragment: F)
         where S: Iterator<Item=Triangle<T>>,
               F: FnMut<(O,), Output=Rgb<u8>>,
-              T: FetchPosition + Clone + Interpolate<Out=O> {
+              T: FetchPosition + Clone + Interpolate<Out=O> + std::fmt::Debug {
 
         let h = self.frame.height();
         let w = self.frame.width();
         let (hf, wf) = (h as f32, w as f32);
         let (hh, wh) = (hf/2., wf/2.);
-        for or in poly {
+        for (idx, or) in poly.enumerate() {
             let t = or.clone().map_vertex(|v| {
                 let v = v.position();
                 Vector4::new(v[0], v[1], v[2], v[3])
@@ -229,44 +252,42 @@ impl Frame {
                 )
             });
             let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
-            let mut sc = clip;
-            sort_vertex_y(&mut sc);
-
-            let mut raster = |x: u32, y: u32| {
-                if x >= w || x  < 0 || y >= h || y < 0 { return } 
-                let p = Vector2::new(x as f32, y as f32);
-                let &Luma(dz) = self.depth.get_pixel(x, h-y-1);
-
-                let v0 = clip.y - clip.x;
-                let v1 = clip.z - clip.x;
-                let v2 = p - clip.x;
-
-                let d00 = v0.dot(&v0);
-                let d01 = v0.dot(&v1);
-                let d02 = v0.dot(&v2);
-                let d11 = v1.dot(&v1);
-                let d12 = v1.dot(&v2);
-
-                let inv_denom = 1. / (d00 * d11 - d01 * d01);
-                let u = (d11 * d02 - d01 * d12) * inv_denom;
-                let v = (d00 * d12 - d01 * d02) * inv_denom;
-
-                let a = 1. - (u+v);
-                let b = u;
-                let c = v;
-
-                let z = a * clip4.x.z + b * clip4.y.z + c * clip4.z.z;
-
-                if u >= 0. && v >= 0. && (u + v) <= 1. && z >= -1. && dz[0] > z {
-                    let frag = Interpolate::interpolate(&or, [a, b, c]);
-                    self.frame.put_pixel(x, h-y-1, fragment(frag));
-                    self.depth.put_pixel(x, h-y-1, Luma([z]));
-                }
-            };
 
             for (y, line) in RasterTriangle::new(clip) {
                 for x in line.iter() {
-                    raster(x as u32, y as u32);
+                    let y = y as u32;
+                    let x = x as u32;
+                    if x >= w || x  < 0 || y >= h || y < 0 { 
+                        continue;
+                    } 
+                    let p = Vector2::new(x as f32, y as f32);
+                    let &Luma(dz) = self.depth.get_pixel(x, h-y-1);
+
+                    let v0 = clip.y - clip.x;
+                    let v1 = clip.z - clip.x;
+                    let v2 = p - clip.x;
+
+                    let d00 = v0.dot(&v0);
+                    let d01 = v0.dot(&v1);
+                    let d02 = v0.dot(&v2);
+                    let d11 = v1.dot(&v1);
+                    let d12 = v1.dot(&v2);
+
+                    let inv_denom = 1. / (d00 * d11 - d01 * d01);
+                    let u = (d11 * d02 - d01 * d12) * inv_denom;
+                    let v = (d00 * d12 - d01 * d02) * inv_denom;
+
+                    let a = 1. - (u+v);
+                    let b = u;
+                    let c = v;
+
+                    let z = a * clip4.x.z + b * clip4.y.z + c * clip4.z.z;
+
+                    if u >= 0. && v >= 0. && (u + v) <= 1. && z >= -1. && dz[0] > z {
+                        let frag = Interpolate::interpolate(&or, [a, b, c]);
+                        self.frame.put_pixel(x, h-y-1, fragment(frag));
+                        self.depth.put_pixel(x, h-y-1, Luma([z]));
+                    }
                 }
             }
         }
@@ -281,7 +302,7 @@ impl Frame {
         let w = self.frame.width();
         let (hf, wf) = (h as f32, w as f32);
         let (hh, wh) = (hf/2., wf/2.);
-        for or in poly {
+        for (idx, or) in poly.enumerate() {
             let t = or.clone().map_vertex(|v| {
                 let v = v.position();
                 Vector4::new(v[0], v[1], v[2], v[3])
@@ -302,41 +323,37 @@ impl Frame {
             });
             let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
 
-            let mut raster = |x: u32, y: u32| {
-                if x >= w || x  < 0 || y >= h || y < 0 { return } 
-                let p = Vector2::new(x as f32, y as f32);
-                let &Luma(dz) = self.depth.get_pixel(x, h-y-1);
-
-                let v0 = clip.y - clip.x;
-                let v1 = clip.z - clip.x;
-                let v2 = p - clip.x;
-
-                let d00 = v0.dot(&v0);
-                let d01 = v0.dot(&v1);
-                let d02 = v0.dot(&v2);
-                let d11 = v1.dot(&v1);
-                let d12 = v1.dot(&v2);
-
-                let inv_denom = 1. / (d00 * d11 - d01 * d01);
-                let u = (d11 * d02 - d01 * d12) * inv_denom;
-                let v = (d00 * d12 - d01 * d02) * inv_denom;
-
-                let a = 1. - (u+v);
-                let b = u;
-                let c = v;
-
-                let z = a * clip4.x.z + b * clip4.y.z + c * clip4.z.z;
-
-                if u >= 0. && v >= 0. && (u + v) <= 1. && z >= -1. && dz[0] > z {
-                    let frag = Interpolate::interpolate(&or, [a, b, c]);
-                    self.frame.put_pixel(x, h-y-1, fragment(frag));
-                    self.depth.put_pixel(x, h-y-1, Luma([z]));
-                }
-            };
-
             for y in 0..h {
                 for x in 0..w {
-                    raster(x, y);
+                    if x >= w || x  < 0 || y >= h || y < 0 { return } 
+                    let p = Vector2::new(x as f32, y as f32);
+                    let &Luma(dz) = self.depth.get_pixel(x, h-y-1);
+
+                    let v0 = clip.y - clip.x;
+                    let v1 = clip.z - clip.x;
+                    let v2 = p - clip.x;
+
+                    let d00 = v0.dot(&v0);
+                    let d01 = v0.dot(&v1);
+                    let d02 = v0.dot(&v2);
+                    let d11 = v1.dot(&v1);
+                    let d12 = v1.dot(&v2);
+
+                    let inv_denom = 1. / (d00 * d11 - d01 * d01);
+                    let u = (d11 * d02 - d01 * d12) * inv_denom;
+                    let v = (d00 * d12 - d01 * d02) * inv_denom;
+
+                    let a = 1. - (u+v);
+                    let b = u;
+                    let c = v;
+
+                    let z = a * clip4.x.z + b * clip4.y.z + c * clip4.z.z;
+
+                    if u >= 0. && v >= 0. && (u + v) <= 1. && z >= -1. && dz[0] > z {
+                        let frag = Interpolate::interpolate(&or, [a, b, c]);
+                        self.frame.put_pixel(x, h-y-1, fragment(frag));
+                        self.depth.put_pixel(x, h-y-1, Luma([z]));
+                    }
                 }
             }
         }
