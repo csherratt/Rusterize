@@ -183,8 +183,9 @@ pub struct BarycentricCoordinate {
 
 impl BarycentricCoordinate {
     /// check if the point is inside the triangle
+    #[inline]
     pub fn inside(&self) -> bool {
-        self.u >= 0. && self.v >= 0. && (self.u + self.v) <= 1.
+        (self.u >= 0.) && (self.v >= 0.) && ((self.u + self.v) <= 1.)
     }
 
     #[inline]

@@ -1,8 +1,11 @@
 [package]
-
 name = "rusterize"
 version = "0.0.1"
 authors = ["Colin Sherratt <colin.sherratt@gmail.com>"]
+
+[lib]
+name = "rusterize"
+path = "src/lib.rs"
 
 [dependencies]
 genmesh = "*"
@@ -12,4 +15,11 @@ cgmath = "*"
 git = "https://github.com/PistonDevelopers/image"
 
 [dev-dependencies]
-obj = "*"
+obj="*"
+gfx="*"
+glfw="*"
+time="*"
+
+[[example]]
+name = "monkey"
+path = "examples/monkey.rs"
