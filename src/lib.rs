@@ -47,14 +47,6 @@ fn sort_vertex_y(v: &mut Triangle<Vector2<f32>>) {
     }
 }
 
-fn scanline<F>(y: u32, s: f32, e: f32, fragment: &mut F) where F: FnMut<(u32, u32)> {
-    if e > s {
-        for x in (s.floor() as u32 .. e.ceil() as u32+1) { fragment(x, y); }
-    } else {
-        for x in (e.floor() as u32 .. s.ceil() as u32+1) { fragment(x, y); }
-    }
-}
-
 /// described a scanline
 #[derive(Debug, Copy, PartialEq, Eq)]
 pub struct Scanline {
@@ -96,36 +88,6 @@ impl Scanline {
 pub struct RasterTriangle {
     bottom: FlatTriangleIter,
     top: FlatTriangleIter
-}
-
-fn fill_bottom<F>(a: Triangle<Vector2<f32>>, fragment: &mut F) where F: FnMut<(u32, u32)> {
-    use std::mem::swap;
-    let inv_slope_0 = (a.y.x - a.x.x) / (a.y.y - a.x.y);
-    let inv_slope_1 = (a.z.x - a.x.x) / (a.z.y - a.x.y);
-
-    let mut curx0 = a.x.x;
-    let mut curx1 = a.x.x;
-
-    for y in (a.x.y.floor() as u32..a.y.y.ceil() as u32) {
-        scanline(y, curx0, curx1, fragment);
-        curx0 += inv_slope_0;
-        curx1 += inv_slope_1;
-    }
-}
-
-fn fill_top<F>(a: Triangle<Vector2<f32>>, fragment: &mut F) where F: FnMut<(u32, u32)> {
-    use std::mem::swap;
-    let inv_slope_0 = (a.z.x - a.x.x) / (a.z.y - a.x.y);
-    let inv_slope_1 = (a.z.x - a.y.x) / (a.z.y - a.y.y);
-
-    let mut curx0 = a.z.x;
-    let mut curx1 = a.z.x;
-
-    for y in (a.y.y.ceil() as u32..a.z.y.floor() as u32+1).rev() {
-        curx0 -= inv_slope_0;
-        curx1 -= inv_slope_1;
-        scanline(y, curx0, curx1, fragment);
-    }
 }
 
 impl RasterTriangle {
@@ -206,6 +168,61 @@ impl Iterator for FlatTriangleIter {
     }
 }
 
+#[derive(Debug)]
+pub struct Barycentric {
+    pub v0: Vector2<f32>,
+    pub v1: Vector2<f32>,
+    pub base: Vector2<f32>
+}
+
+#[derive(Debug)]
+pub struct BarycentricCoordinate {
+    pub u: f32,
+    pub v: f32,
+}
+
+impl BarycentricCoordinate {
+    /// check if the point is inside the triangle
+    pub fn inside(&self) -> bool {
+        self.u >= 0. && self.v >= 0. && (self.u + self.v) <= 1.
+    }
+
+    #[inline]
+    pub fn weights(&self) -> [f32; 3] {
+        [1. - self.u - self.v, self.u, self.v]
+    }
+}
+
+impl Barycentric {
+    pub fn new(t: Triangle<Vector2<f32>>) -> Barycentric {
+        Barycentric {
+            v0: t.y - t.x,
+            v1: t.z - t.x,
+            base: t.x
+        }
+    }
+
+    #[inline]
+    pub fn coordinate(&self, p: Vector2<f32>) -> BarycentricCoordinate {
+        let v2 = p - self.base;
+
+        let d00 = self.v0.dot(&self.v0);
+        let d01 = self.v0.dot(&self.v1);
+        let d02 = self.v0.dot(&v2);
+        let d11 = self.v1.dot(&self.v1);
+        let d12 = self.v1.dot(&v2);
+
+        let inv_denom = 1. / (d00 * d11 - d01 * d01);
+        let u = (d11 * d02 - d01 * d12) * inv_denom;
+        let v = (d00 * d12 - d01 * d02) * inv_denom;
+
+        BarycentricCoordinate {
+            u: u,
+            v: v
+        }
+    }
+}
+
 impl Frame {
     pub fn new(width: u32, height: u32) -> Frame {
         Frame {
@@ -232,7 +249,7 @@ impl Frame {
         let w = self.frame.width();
         let (hf, wf) = (h as f32, w as f32);
         let (hh, wh) = (hf/2., wf/2.);
-        for (idx, or) in poly.enumerate() {
+        for or in poly {
             let t = or.clone().map_vertex(|v| {
                 let v = v.position();
                 Vector4::new(v[0], v[1], v[2], v[3])
@@ -251,40 +268,26 @@ impl Frame {
                     v.w / v.w
                 )
             });
+
             let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
+            let bary = Barycentric::new(clip);
 
             for (y, line) in RasterTriangle::new(clip) {
-                for x in line.iter() {
-                    let y = y as u32;
+                let y = y as u32;
+                if y >= h { continue; }
+
+                for x in line.limit(0, w as i32-1).iter() {
                     let x = x as u32;
-                    if x >= w || x  < 0 || y >= h || y < 0 { 
-                        continue;
-                    } 
                     let p = Vector2::new(x as f32, y as f32);
                     let &Luma(dz) = self.depth.get_pixel(x, h-y-1);
 
-                    let v0 = clip.y - clip.x;
-                    let v1 = clip.z - clip.x;
-                    let v2 = p - clip.x;
+                    let cood = bary.coordinate(p);
+                    let w = cood.weights();
 
-                    let d00 = v0.dot(&v0);
-                    let d01 = v0.dot(&v1);
-                    let d02 = v0.dot(&v2);
-                    let d11 = v1.dot(&v1);
-                    let d12 = v1.dot(&v2);
+                    let z = w[0] * clip4.x.z + w[1] * clip4.y.z + w[2] * clip4.z.z;
 
-                    let inv_denom = 1. / (d00 * d11 - d01 * d01);
-                    let u = (d11 * d02 - d01 * d12) * inv_denom;
-                    let v = (d00 * d12 - d01 * d02) * inv_denom;
-
-                    let a = 1. - (u+v);
-                    let b = u;
-                    let c = v;
-
-                    let z = a * clip4.x.z + b * clip4.y.z + c * clip4.z.z;
-
-                    if u >= 0. && v >= 0. && (u + v) <= 1. && z >= -1. && dz[0] > z {
-                        let frag = Interpolate::interpolate(&or, [a, b, c]);
+                    if cood.inside() && z >= -1. && dz[0] > z {
+                        let frag = Interpolate::interpolate(&or, w);
                         self.frame.put_pixel(x, h-y-1, fragment(frag));
                         self.depth.put_pixel(x, h-y-1, Luma([z]));
                     }
@@ -302,7 +305,7 @@ impl Frame {
         let w = self.frame.width();
         let (hf, wf) = (h as f32, w as f32);
         let (hh, wh) = (hf/2., wf/2.);
-        for (idx, or) in poly.enumerate() {
+        for or in poly {
             let t = or.clone().map_vertex(|v| {
                 let v = v.position();
                 Vector4::new(v[0], v[1], v[2], v[3])
@@ -325,7 +328,7 @@ impl Frame {
 
             for y in 0..h {
                 for x in 0..w {
-                    if x >= w || x  < 0 || y >= h || y < 0 { return } 
+                    if x >= w || y >= h { return } 
                     let p = Vector2::new(x as f32, y as f32);
                     let &Luma(dz) = self.depth.get_pixel(x, h-y-1);
 
@@ -402,17 +405,20 @@ pub struct Flat<T>(pub T);
 
 impl<T: Clone> Interpolate for Flat<T> {
     type Out = T;
+    #[inline]
     fn interpolate(src: &Triangle<Flat<T>>, _: [f32; 3]) -> T { src.x.0.clone() }
 }
 
 pub trait Interpolate {
     type Out;
 
+    #[inline]
     fn interpolate(src: &Triangle<Self>, w: [f32; 3]) -> Self::Out;
 }
 
 impl Interpolate for f32 {
     type Out = f32;
+    #[inline]
     fn interpolate(src: &Triangle<f32>, w: [f32; 3]) -> f32 {
         src.x * w[0] + src.y * w[1] + src.z * w[2]
     }
@@ -420,6 +426,7 @@ impl Interpolate for f32 {
 
 impl Interpolate for [f32; 2] {
     type Out = [f32; 2];
+    #[inline]
     fn interpolate(src: &Triangle<[f32; 2]>, w: [f32; 3]) -> [f32; 2] {
         [Interpolate::interpolate(&Triangle::new(src.x[0], src.y[0], src.z[0]), w),
          Interpolate::interpolate(&Triangle::new(src.x[1], src.y[1], src.z[1]), w)]
@@ -428,6 +435,7 @@ impl Interpolate for [f32; 2] {
 
 impl Interpolate for [f32; 3] {
     type Out = [f32; 3];
+    #[inline]
     fn interpolate(src: &Triangle<[f32; 3]>, w: [f32; 3]) -> [f32; 3] {
         [Interpolate::interpolate(&Triangle::new(src.x[0], src.y[0], src.z[0]), w),
          Interpolate::interpolate(&Triangle::new(src.x[1], src.y[1], src.z[1]), w),
@@ -437,6 +445,7 @@ impl Interpolate for [f32; 3] {
 
 impl Interpolate for [f32; 4] {
     type Out = [f32; 4];
+    #[inline]
     fn interpolate(src: &Triangle<[f32; 4]>, w: [f32; 3]) -> [f32; 4] {
         [Interpolate::interpolate(&Triangle::new(src.x[0], src.y[0], src.z[0]), w),
          Interpolate::interpolate(&Triangle::new(src.x[1], src.y[1], src.z[1]), w),
@@ -449,6 +458,7 @@ impl<A, B, AO, BO> Interpolate for (A, B)
     where A: Interpolate<Out=AO> + Clone,
           B: Interpolate<Out=BO> + Clone {
     type Out = (AO, BO);
+    #[inline]
     fn interpolate(src: &Triangle<(A, B)>, w: [f32; 3]) -> (AO, BO) {
         (Interpolate::interpolate(&Triangle::new(src.x.0.clone(), src.y.0.clone(), src.z.0.clone()), w),
          Interpolate::interpolate(&Triangle::new(src.x.1.clone(), src.y.1.clone(), src.z.1.clone()), w))
@@ -460,6 +470,7 @@ impl<A, B, C, AO, BO, CO> Interpolate for (A, B, C)
           B: Interpolate<Out=BO> + Clone,
           C: Interpolate<Out=CO> + Clone {
     type Out = (AO, BO, CO);
+    #[inline]
     fn interpolate(src: &Triangle<(A, B, C)>, w: [f32; 3]) -> (AO, BO, CO) {
         (Interpolate::interpolate(&Triangle::new(src.x.0.clone(), src.y.0.clone(), src.z.0.clone()), w),
          Interpolate::interpolate(&Triangle::new(src.x.1.clone(), src.y.1.clone(), src.z.1.clone()), w),
@@ -473,6 +484,7 @@ impl<A, B, C, D, AO, BO, CO, DO> Interpolate for (A, B, C, D)
           C: Interpolate<Out=CO> + Clone,
           D: Interpolate<Out=DO> + Clone {
     type Out = (AO, BO, CO, DO);
+    #[inline]
     fn interpolate(src: &Triangle<(A, B, C, D)>, w: [f32; 3]) -> (AO, BO, CO, DO) {
         (Interpolate::interpolate(&Triangle::new(src.x.0.clone(), src.y.0.clone(), src.z.0.clone()), w),
          Interpolate::interpolate(&Triangle::new(src.x.1.clone(), src.y.1.clone(), src.z.1.clone()), w),
@@ -488,6 +500,7 @@ impl<A, B, C, D, E, AO, BO, CO, DO, EO> Interpolate for (A, B, C, D, E)
           D: Interpolate<Out=DO> + Clone,
           E: Interpolate<Out=EO> + Clone {
     type Out = (AO, BO, CO, DO, EO);
+    #[inline]
     fn interpolate(src: &Triangle<(A, B, C, D, E)>, w: [f32; 3]) -> (AO, BO, CO, DO, EO) {
         (Interpolate::interpolate(&Triangle::new(src.x.0.clone(), src.y.0.clone(), src.z.0.clone()), w),
          Interpolate::interpolate(&Triangle::new(src.x.1.clone(), src.y.1.clone(), src.z.1.clone()), w),
@@ -505,6 +518,7 @@ impl<A, B, C, D, E, F, AO, BO, CO, DO, EO, FO> Interpolate for (A, B, C, D, E, F
           E: Interpolate<Out=EO> + Clone,
           F: Interpolate<Out=FO> + Clone {
     type Out = (AO, BO, CO, DO, EO, FO);
+    #[inline]
     fn interpolate(src: &Triangle<(A, B, C, D, E, F)>, w: [f32; 3]) -> (AO, BO, CO, DO, EO, FO) {
         (Interpolate::interpolate(&Triangle::new(src.x.0.clone(), src.y.0.clone(), src.z.0.clone()), w),
          Interpolate::interpolate(&Triangle::new(src.x.1.clone(), src.y.1.clone(), src.z.1.clone()), w),
@@ -524,6 +538,7 @@ impl<A, B, C, D, E, F, G, AO, BO, CO, DO, EO, FO, GO> Interpolate for (A, B, C, 
           F: Interpolate<Out=FO> + Clone,
           G: Interpolate<Out=GO> + Clone {
     type Out = (AO, BO, CO, DO, EO, FO, GO);
+    #[inline]
     fn interpolate(src: &Triangle<(A, B, C, D, E, F, G)>, w: [f32; 3]) -> (AO, BO, CO, DO, EO, FO, GO) {
         (Interpolate::interpolate(&Triangle::new(src.x.0.clone(), src.y.0.clone(), src.z.0.clone()), w),
          Interpolate::interpolate(&Triangle::new(src.x.1.clone(), src.y.1.clone(), src.z.1.clone()), w),
@@ -545,6 +560,7 @@ impl<A, B, C, D, E, F, G, H, AO, BO, CO, DO, EO, FO, GO, HO> Interpolate for (A,
           G: Interpolate<Out=GO> + Clone,
           H: Interpolate<Out=HO> + Clone {
     type Out = (AO, BO, CO, DO, EO, FO, GO, HO);
+    #[inline]
     fn interpolate(src: &Triangle<(A, B, C, D, E, F, G, H)>, w: [f32; 3]) -> (AO, BO, CO, DO, EO, FO, GO, HO) {
         (Interpolate::interpolate(&Triangle::new(src.x.0.clone(), src.y.0.clone(), src.z.0.clone()), w),
          Interpolate::interpolate(&Triangle::new(src.x.1.clone(), src.y.1.clone(), src.z.1.clone()), w),

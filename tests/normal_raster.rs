@@ -5,7 +5,6 @@ extern crate cgmath;
 
 use genmesh::Triangle;
 use rusterize::{
-    RasterTriangle,
     FlatTriangleIter,
     Scanline
 };

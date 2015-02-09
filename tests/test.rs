@@ -25,7 +25,7 @@ fn check(name: &str, frame: Frame) {
     for y in (0..height) {
         for x in (0..width) {
             let &Luma([p]) = frame.depth.get_pixel(x, y);
-            out.put_pixel(x, y, Luma([(p * 255.) as u8]));
+            out.put_pixel(x, y, Luma([(p * 128. + 128.) as u8]));
         }
     }
 
@@ -37,7 +37,7 @@ fn check(name: &str, frame: Frame) {
 }
 
 fn proj() -> Matrix4<f32> {
-    ortho(-1., 1., -1., 1., -100., 10.)
+    ortho(-1., 1., -1., 1., -2., 2.)
 }
 
 #[test]
@@ -217,7 +217,6 @@ fn triangle_flat() {
 
 #[test]
 fn monkey() {
-    use genmesh::Triangle;
     let obj = obj::load(&Path::new("test_assets/monkey.obj")).unwrap();
     let monkey = obj.object_iter().next().unwrap().group_iter().next().unwrap();
 
