@@ -256,11 +256,6 @@ impl Frame {
                 Vector4::new(v[0], v[1], v[2], v[3])
             });
 
-            // cull any backface triangles
-            if is_backface(t.map_vertex(|v| Vector3::new(v.x, v.y, v.z))) {
-                continue;
-            }
-
             let clip4 = t.map_vertex(|v| {
                 Vector4::new(
                     hh * (v.x / v.w) + hh,
@@ -269,6 +264,11 @@ impl Frame {
                     v.w / v.w
                 )
             });
+
+            // cull any backface triangles
+            if is_backface(clip4.map_vertex(|v| Vector3::new(v.x, v.y, v.z))) {
+                continue;
+            }
 
             let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
             let bary = Barycentric::new(clip);
@@ -312,11 +312,6 @@ impl Frame {
                 Vector4::new(v[0], v[1], v[2], v[3])
             });
 
-            // cull any backface triangles
-            if is_backface(t.map_vertex(|v| Vector3::new(v.x, v.y, v.z))) {
-                continue;
-            }
-
             let clip4 = t.map_vertex(|v| {
                 Vector4::new(
                     hh * (v.x / v.w) + hh,
@@ -325,6 +320,12 @@ impl Frame {
                     v.w / v.w
                 )
             });
+
+            // cull any backface triangles
+            if is_backface(clip4.map_vertex(|v| Vector3::new(v.x, v.y, v.z))) {
+                continue;
+            }
+
             let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
 
             for y in 0..h {
