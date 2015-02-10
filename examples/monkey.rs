@@ -12,6 +12,7 @@ extern crate time;
 use gfx::Device;
 use glfw::Context;
 use genmesh::{Triangulate, MapToVertices};
+use genmesh::generators::Cube;
 use rusterize::Frame;
 use image::Rgb;
 use cgmath::*;

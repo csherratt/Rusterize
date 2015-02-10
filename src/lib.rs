@@ -327,35 +327,21 @@ impl Frame {
             }
 
             let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
+            let bary = Barycentric::new(clip);
 
             for y in 0..h {
                 for x in 0..w {
-                    if x >= w || y >= h { return } 
+                    let x = x as u32;
                     let p = Vector2::new(x as f32, y as f32);
                     let &Luma(dz) = self.depth.get_pixel(x, h-y-1);
 
-                    let v0 = clip.y - clip.x;
-                    let v1 = clip.z - clip.x;
-                    let v2 = p - clip.x;
+                    let cood = bary.coordinate(p);
+                    let w = cood.weights();
 
-                    let d00 = v0.dot(&v0);
-                    let d01 = v0.dot(&v1);
-                    let d02 = v0.dot(&v2);
-                    let d11 = v1.dot(&v1);
-                    let d12 = v1.dot(&v2);
+                    let z = w[0] * clip4.x.z + w[1] * clip4.y.z + w[2] * clip4.z.z;
 
-                    let inv_denom = 1. / (d00 * d11 - d01 * d01);
-                    let u = (d11 * d02 - d01 * d12) * inv_denom;
-                    let v = (d00 * d12 - d01 * d02) * inv_denom;
-
-                    let a = 1. - (u+v);
-                    let b = u;
-                    let c = v;
-
-                    let z = a * clip4.x.z + b * clip4.y.z + c * clip4.z.z;
-
-                    if u >= 0. && v >= 0. && (u + v) <= 1. && z >= -1. && dz[0] > z {
-                        let frag = Interpolate::interpolate(&or, [a, b, c]);
+                    if cood.inside() && z >= -1. && dz[0] > z {
+                        let frag = Interpolate::interpolate(&or, w);
                         self.frame.put_pixel(x, h-y-1, fragment(frag));
                         self.depth.put_pixel(x, h-y-1, Luma([z]));
                     }
