@@ -10,6 +10,8 @@ use genmesh::{Triangle, MapVertex};
 use std::num::Float;
 use std::ops::Range;
 
+pub mod tile;
+
 #[cfg(dump)]
 fn dump(idx: usize, frame: &Frame) {
     use std::old_io::File;
@@ -172,7 +174,8 @@ impl Iterator for FlatTriangleIter {
 pub struct Barycentric {
     pub v0: Vector2<f32>,
     pub v1: Vector2<f32>,
-    pub base: Vector2<f32>
+    pub base: Vector2<f32>,
+    inv_denom: f32
 }
 
 #[derive(Debug)]
@@ -196,10 +199,20 @@ impl BarycentricCoordinate {
 
 impl Barycentric {
     pub fn new(t: Triangle<Vector2<f32>>) -> Barycentric {
+        let v0 = t.y - t.x;
+        let v1 = t.z - t.x;
+
+        let d00 = v0.dot(&v0);
+        let d01 = v0.dot(&v1);
+        let d11 = v1.dot(&v1);
+
+        let inv_denom = 1. / (d00 * d11 - d01 * d01);
+
         Barycentric {
-            v0: t.y - t.x,
-            v1: t.z - t.x,
-            base: t.x
+            v0: v0,
+            v1: v1,
+            base: t.x,
+            inv_denom: inv_denom
         }
     }
 
@@ -213,9 +226,8 @@ impl Barycentric {
         let d11 = self.v1.dot(&self.v1);
         let d12 = self.v1.dot(&v2);
 
-        let inv_denom = 1. / (d00 * d11 - d01 * d01);
-        let u = (d11 * d02 - d01 * d12) * inv_denom;
-        let v = (d00 * d12 - d01 * d02) * inv_denom;
+        let u = (d11 * d02 - d01 * d12) * self.inv_denom;
+        let v = (d00 * d12 - d01 * d02) * self.inv_denom;
 
         BarycentricCoordinate {
             u: u,

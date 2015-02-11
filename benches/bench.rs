@@ -8,10 +8,11 @@ extern crate test;
 extern crate obj;
 
 use rusterize::Frame;
+use rusterize::tile::Tile;
 use cgmath::*;
 use genmesh::generators;
-use genmesh::{Triangulate, MapToVertices};
-use test::Bencher;
+use genmesh::{Triangulate, MapToVertices, Triangle};
+use test::{Bencher, black_box};
 use image::Rgb;
 
 const SIZE: u32 = 1024;
@@ -126,4 +127,26 @@ fn buffer_clear(bench: &mut Bencher) {
     let mut frame = Frame::new(SIZE, SIZE);
 
     bench.iter(|| { frame.clear(); });
+}
+
+
+#[bench]
+fn tile_new(bench: &mut Bencher) {
+    let mut tile = Tile::new();
+
+    bench.iter(|| {
+        black_box(Tile::new())
+    });
+}
+
+#[bench]
+fn tile_raster(bench: &mut Bencher) {
+    let tri = Triangle::new(Vector4::new(0., 0., 0., 0.),
+                            Vector4::new(1., 1., 0., 0.),
+                            Vector4::new(0., 1., 0., 0.));
+    let mut tile = Tile::new();
+
+    bench.iter(|| {
+        black_box(tile.raster(&tri));
+    });
 }
