@@ -13,7 +13,7 @@ use gfx::Device;
 use glfw::Context;
 use genmesh::{Triangulate, MapToVertices};
 use genmesh::generators::Cube;
-use rusterize::Frame;
+use rusterize::{Frame, Fragment};
 use image::Rgb;
 use cgmath::*;
 use time::precise_time_s;
@@ -93,12 +93,24 @@ fn main() {
                            .vertex(|(p, n)| (mat.mul_v(&Vector4::new(p[0], p[1], p[2], 1.)).into_fixed(), n))
                            .triangulate();
 
+        struct V {
+            ka: Vector4<f32>,
+            kd: Vector4<f32>,
+            light_normal: Vector4<f32>
+        }
+
+        impl Fragment<([f32; 4], [f32; 3])> for V {
+            type Color = Rgb<u8>;
+
+            fn fragment(&self, (_, n) : ([f32; 4], [f32; 3])) -> Rgb<u8> {
+                let normal = Vector4::new(n[0], n[1], n[2], 0.);
+                let v = self.kd.mul_s(self.light_normal.dot(&normal).partial_max(0.)) + self.ka;
+                Rgb([v.x as u8, v.y as u8, v.z as u8])
+            }
+        }
+
         frame.clear();
-        frame.raster(vertex, |(_, n)| {
-            let normal = Vector4::new(n[0], n[1], n[2], 0.);
-            let v = kd.mul_s(light_normal.dot(&normal).partial_max(0.))  + ka;
-            Rgb([v.x as u8, v.y as u8, v.z as u8])
-        });
+        frame.raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
         graphics.device.update_texture(&texture, &image_info, frame.frame.as_slice()).unwrap();
 
         graphics.renderer.blit(&texture_frame,

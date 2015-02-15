@@ -6,7 +6,7 @@ extern crate cgmath;
 extern crate rusterize;
 extern crate obj;
 
-use rusterize::{Frame, Flat};
+use rusterize::{Frame, Flat, Fragment};
 use cgmath::*;
 use genmesh::generators;
 use genmesh::{Triangulate, MapToVertices};
@@ -40,6 +40,14 @@ fn proj() -> Matrix4<f32> {
     ortho(-1., 1., -1., 1., -2., 2.)
 }
 
+struct SetValue(Rgb<u8>);
+
+impl Fragment<[f32; 4]> for SetValue {
+    type Color = Rgb<u8>;
+
+    fn fragment(&self, v: [f32; 4]) -> Rgb<u8> { self.0 }
+}
+
 #[test]
 fn plane_simple() {
     let mut frame = Frame::new(SIZE, SIZE);
@@ -47,9 +55,7 @@ fn plane_simple() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 2.).mul_s(0.5)).into_fixed());
 
-    frame.raster(cube, |_| {
-        Rgb([255, 255, 255])
-    });
+    frame.raster(cube, SetValue(Rgb([255, 255, 255])));
 
     check("plane", frame);
 }
@@ -61,9 +67,7 @@ fn plane_backface() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(-v.0, v.1, 0., 2.).mul_s(0.5)).into_fixed());
 
-    frame.raster(cube, |_| {
-        Rgb([255, 255, 255])
-    });
+    frame.raster(cube, SetValue(Rgb([255, 255, 255])));
 
     check("plane_backface", frame);
 }
@@ -75,9 +79,7 @@ fn plane_fill() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
 
-    frame.raster(cube, |_| {
-        Rgb([255, 255, 255])
-    });
+    frame.raster(cube,SetValue(Rgb([255, 255, 255])));
 
     check("plane_fill", frame);
 }
@@ -89,9 +91,7 @@ fn plane_overfill() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0 * 100., v.1 * 100., 0., 2.)).into_fixed());
 
-    frame.raster(cube, |_| {
-        Rgb([255, 255, 255])
-    });
+    frame.raster(cube, SetValue(Rgb([255, 255, 255])));
 
     check("plane_overfill", frame);
 }
@@ -103,17 +103,13 @@ fn plane_back_front() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
 
-    frame.raster(cube, |_| {
-        Rgb([255, 255, 255])
-    });
+    frame.raster(cube, SetValue(Rgb([255, 255, 255])));
 
     let cube = generators::Plane::new()
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 1., 1.)).into_fixed());
 
-    frame.raster(cube, |_| {
-        Rgb([128, 128, 128])
-    });
+    frame.raster(cube, SetValue(Rgb([255, 255, 255])));
 
     check("plane_back_front", frame);
 }
@@ -125,17 +121,13 @@ fn plane_front_back() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 1., 1.)).into_fixed());
 
-    frame.raster(cube, |_| {
-        Rgb([255, 255, 255])
-    });
+    frame.raster(cube, SetValue(Rgb([255, 255, 255])));
 
     let cube = generators::Plane::new()
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
 
-    frame.raster(cube, |_| {
-        Rgb([128, 128, 128])
-    });
+    frame.raster(cube, SetValue(Rgb([128, 128, 128])));
 
     check("plane_front_back", frame);
 }
@@ -149,12 +141,12 @@ fn cube() {
     let rot = rot.to_matrix4();
 
     let triangle = [
-        [255.0, 0.0, 0.0],
-        [0.0, 255.0, 0.0],
-        [0.0, 0.0, 255.0],
+        [255.0, 0.0,   0.0],
+        [0.0,   255.0, 0.0],
+        [0.0,   0.0,   255.0],
         [255.0, 255.0, 0.0],
-        [0.0, 255.0, 255.0],
-        [255.0, 0.0, 255.0],
+        [0.0,   255.0, 255.0],
+        [255.0, 0.0,   255.0],
     ];
     let mut i = 0;
 
@@ -172,10 +164,17 @@ fn cube() {
             )
         });
 
-    frame.raster(cube, |(_, color)| {
-        Rgb([color[0] as u8, color[1] as u8, color[2] as u8])
-    });
+    struct V;
 
+    impl Fragment<([f32; 4], [f32; 3])> for V {
+        type Color = Rgb<u8>;
+
+        fn fragment(&self, (_, color) : ([f32; 4], [f32; 3])) -> Rgb<u8> {
+            Rgb([color[0] as u8, color[1] as u8, color[2] as u8])
+        }
+    }
+
+    frame.raster(cube, V);
     check("cube", frame);
 }
 
@@ -189,10 +188,18 @@ fn triangle() {
         ([  0.0,  0.5, 0., 1., ], [0.0, 0.0, 1.0]),
     )];
 
+    struct V;
+
+    impl Fragment<([f32; 4], [f32; 3])> for V {
+        type Color = Rgb<u8>;
+
+        fn fragment(&self, (_, color) : ([f32; 4], [f32; 3])) -> Rgb<u8> {
+            Rgb([(color[0] * 255.) as u8, (color[1] * 255.) as u8, (color[2] * 255.) as u8])
+        }
+    }
+
     let mut frame = Frame::new(SIZE, SIZE);
-    frame.raster(triangle.iter().map(|x| *x), |(_, color)| {
-        Rgb([(color[0] * 255.) as u8, (color[1] * 255.) as u8, (color[2] * 255.) as u8])
-    });
+    frame.raster(triangle.iter().map(|x| *x), V);
 
     check("triangle", frame);
 }
@@ -207,10 +214,18 @@ fn triangle_flat() {
         ([  0.0,  0.5, 0., 1., ], Flat([0.0, 0.0, 1.0])),
     )];
 
+    struct V;
+
+    impl Fragment<([f32; 4], [f32; 3])> for V {
+        type Color = Rgb<u8>;
+
+        fn fragment(&self, (_, color) : ([f32; 4], [f32; 3])) -> Rgb<u8> {
+            Rgb([(color[0] * 255.) as u8, (color[1] * 255.) as u8, (color[2] * 255.) as u8])
+        }
+    }
+
     let mut frame = Frame::new(SIZE, SIZE);
-    frame.raster(triangle.iter().map(|x| *x), |(_, color)| {
-        Rgb([(color[0] * 255.) as u8, (color[1] * 255.) as u8, (color[2] * 255.) as u8])
-    });
+    frame.raster(triangle.iter().map(|x| *x), V);
 
     check("triangle_flat", frame);
 }
@@ -231,12 +246,24 @@ fn monkey() {
                        .vertex(|(p, n)| (proj.mul_v(&Vector4::new(p[0], p[1], p[2], 1.)).into_fixed(), n))
                        .triangulate();
 
+    struct V {
+        ka: Vector4<f32>,
+        kd: Vector4<f32>,
+        light_normal: Vector4<f32>
+    }
+
+    impl Fragment<([f32; 4], [f32; 3])> for V {
+        type Color = Rgb<u8>;
+
+        fn fragment(&self, (_, n) : ([f32; 4], [f32; 3])) -> Rgb<u8> {
+            let normal = Vector4::new(n[0], n[1], n[2], 0.);
+            let v = self.kd.mul_s(self.light_normal.dot(&normal).partial_max(0.)) + self.ka;
+            Rgb([v.x as u8, v.y as u8, v.z as u8])
+        }
+    }
+
     let mut frame = Frame::new(SIZE, SIZE);
-    frame.raster(vertex, |(_, n)| {
-        let normal = Vector4::new(n[0], n[1], n[2], 0.);
-        let v = kd.mul_s(light_normal.dot(&normal).partial_max(0.))  + ka;
-        Rgb([v.x as u8, v.y as u8, v.z as u8])
-    });
+    frame.raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
     check("monkey", frame);
 }
 
@@ -247,9 +274,7 @@ fn buffer_clear() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
 
-    frame.raster(cube, |_| {
-        Rgb([255, 255, 255])
-    });
+    frame.raster(cube, SetValue(Rgb([255, 255, 255])));
     frame.clear();
     check("buffer_clear", frame);
 }

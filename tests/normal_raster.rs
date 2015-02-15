@@ -1,3 +1,4 @@
+#![feature(path, io)]
 
 extern crate rusterize;
 extern crate genmesh;
@@ -94,10 +95,9 @@ fn bottom_right_angle_1() {
     assert_eq!(top.next(), Some((3, Scanline::new(0., 3.))));
 }
 
-
 #[test]
 fn random_triangles() {
-    for i in (0..1000) {
+    for i in (0..100) {
         let mut expected = Frame::new(64, 64);
         let mut result = Frame::new(64, 64);
         let triangle = Some(Triangle::new(
