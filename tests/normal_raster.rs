@@ -2,13 +2,18 @@
 extern crate rusterize;
 extern crate genmesh;
 extern crate cgmath;
+extern crate image;
+extern crate rand;
 
+use rand::{thread_rng, Rng};
 use genmesh::Triangle;
 use rusterize::{
     FlatTriangleIter,
-    Scanline
+    Scanline,
+    Frame
 };
 use cgmath::*;
+use image::Rgb;
 
 
 #[test]
@@ -69,4 +74,29 @@ fn bottom_right_angle_1() {
     assert_eq!(top.next(), Some((1, Scanline::new(2, 3))));
     assert_eq!(top.next(), Some((2, Scanline::new(1, 3))));
     assert_eq!(top.next(), Some((3, Scanline::new(0, 3))));
+}
+
+
+#[test]
+fn random_triangles() {
+    for _ in (0..1000) {
+        let mut known = Frame::new(64, 64);
+        let mut result = Frame::new(64, 64);
+        let triangle = Some(Triangle::new(
+            [thread_rng().gen_range(-1f32, 1.), thread_rng().gen_range(-1f32, 1.), 0., 1.],
+            [thread_rng().gen_range(-1f32, 1.), thread_rng().gen_range(-1f32, 1.), 0., 1.],
+            [thread_rng().gen_range(-1f32, 1.), thread_rng().gen_range(-1f32, 1.), 0., 1.]
+        ));
+        println!("{:?}", triangle);
+
+        known.debug_raster(triangle.iter().map(|x| *x), |_| {
+            Rgb([255, 255, 255])
+        });
+        result.raster(triangle.iter().map(|x| *x), |_| {
+            Rgb([255, 255, 255])
+        });
+
+        assert!(result.frame.as_slice() == known.frame.as_slice());
+    }
+
 }

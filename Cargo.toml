@@ -19,6 +19,7 @@ obj="*"
 gfx="*"
 glfw="*"
 time="*"
+rand="*"
 
 [[example]]
 name = "monkey"
