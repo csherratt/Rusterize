@@ -50,10 +50,10 @@ fn sort_vertex_y(v: &mut Triangle<Vector2<f32>>) {
 }
 
 /// described a scanline
-#[derive(Debug, Copy, PartialEq, Eq)]
+#[derive(Debug, Copy, PartialEq)]
 pub struct Scanline {
-    pub start: i32,
-    pub end: i32
+    pub start: f32,
+    pub end: f32,
 }
 
 pub type ScanlineIter = std::ops::Range<i32>;
@@ -61,7 +61,7 @@ pub type ScanlineIter = std::ops::Range<i32>;
 impl Scanline {
     /// create a new scanline between two points, a & b
     /// this is inclusive, so if a == b one point is valid
-    pub fn new(a: i32, b: i32) -> Scanline {
+    pub fn new(a: f32, b: f32) -> Scanline {
         if a > b {
             Scanline { start: b, end: a }
         } else {
@@ -72,18 +72,26 @@ impl Scanline {
     /// limit, limit a scanline between to points
     /// min and max are inclusive. If a screen buffer is 64 pixels wide
     /// you will need to call `limit(0, 63)` for example.
-    pub fn limit(self, min: i32, max: i32) -> Scanline {
-        use std::cmp;
-        let start = cmp::min(cmp::max(self.start, min), max);
-        let end = cmp::min(cmp::max(self.end, min), max);
-        Scanline {
-            start: start,
-            end: end
+    pub fn limit_iter(self, min: i32, max: i32) -> ScanlineIter {
+        let mut start = self.start.ceil() as i32;
+        let mut end = self.end.floor() as i32 + 1;
+        if start < min {
+            start = min;
+        } else if start > max {
+            start = max;
         }
+        if end < min {
+            end = min;
+        } else if end > max {
+            end = max;
+        }
+        start..end
     }
 
     /// create an ScanlineIter from 
-    pub fn iter(self) -> ScanlineIter { self.start..(self.end+1) }
+    pub fn iter(self) -> ScanlineIter {
+        (self.start.ceil() as i32)..(self.end.floor() as i32 +1)
+    }
 }
 
 #[derive(Debug)]
@@ -133,7 +141,7 @@ impl FlatTriangleIter {
         }
 
         FlatTriangleIter {
-            range: Scanline::new(a.x.y.round() as i32, a.z.y.ceil() as i32).iter(),
+            range: Scanline::new(a.x.y, a.z.y).iter(),
             slope: [(a.x.x - a.y.x) / (a.x.y - a.y.y),
                     (a.x.x - a.z.x) / (a.x.y - a.z.y)],
             cursor: [a.x.x, a.x.x],
@@ -149,7 +157,7 @@ impl FlatTriangleIter {
         }
 
         FlatTriangleIter {
-            range: Scanline::new(a.x.y.round() as i32, a.z.y.ceil() as i32).iter(),
+            range: Scanline::new(a.x.y, a.z.y).iter(),
             slope: [(a.z.x - a.x.x) / (a.z.y - a.x.y),
                     (a.z.x - a.y.x) / (a.z.y - a.y.y)],
             cursor: [a.x.x, a.y.x],
@@ -165,7 +173,7 @@ impl Iterator for FlatTriangleIter {
             let yf = y as f32;
             let s = (yf - self.base[0]) * self.slope[0] + self.cursor[0];
             let e = (yf - self.base[1]) * self.slope[1] + self.cursor[1];
-            (y, Scanline::new(s as i32, e as i32))
+            (y, Scanline::new(s, e))
         })
     }
 }
@@ -289,7 +297,7 @@ impl Frame {
                 let y = y as u32;
                 if y >= h { continue; }
 
-                for x in line.limit(0, w as i32-1).iter() {
+                for x in line.limit_iter(0, w as i32) {
                     let x = x as u32;
                     let p = Vector2::new(x as f32, y as f32);
                     let &Luma(dz) = self.depth.get_pixel(x, h-y-1);
@@ -299,7 +307,7 @@ impl Frame {
 
                     let z = w[0] * clip4.x.z + w[1] * clip4.y.z + w[2] * clip4.z.z;
 
-                    if cood.inside() && z >= -1. && dz[0] > z {
+                    if /*cood.inside() &&*/ z >= -1. && dz[0] > z {
                         let frag = Interpolate::interpolate(&or, w);
                         self.frame.put_pixel(x, h-y-1, fragment(frag));
                         self.depth.put_pixel(x, h-y-1, Luma([z]));
