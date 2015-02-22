@@ -2,18 +2,18 @@ use std::simd::*;
 use std::ops::*;
 use cgmath::*;
 
-#[derive(Copy, Clone)]
-pub struct f32x16([f32x4; 4]);
+#[derive(Copy, Debug)]
+pub struct f32x16(pub [f32x4; 4]);
 
 impl f32x16 {
     #[inline]
-    pub fn new(v0: f32, v1: f32, v2: f32, v3: f32,
-           v4: f32, v5: f32, v6: f32, v7: f32,
-           v8: f32, v9: f32, v10: f32, v11: f32,
-           v12: f32, v13: f32, v14: f32, v15: f32) -> f32x16 {
-        f32x16([f32x4(v0, v1, v2, v3),
-                f32x4(v4, v5, v6, v7),
-                f32x4(v8, v9, v10, v11),
+    pub fn new(v0: f32,  v1: f32,  v2: f32,  v3: f32,
+               v4: f32,  v5: f32,  v6: f32,  v7: f32,
+               v8: f32,  v9: f32,  v10: f32, v11: f32,
+               v12: f32, v13: f32, v14: f32, v15: f32) -> f32x16 {
+        f32x16([f32x4(v0,  v1,  v2,  v3),
+                f32x4(v4,  v5,  v6,  v7),
+                f32x4(v8,  v9,  v10, v11),
                 f32x4(v12, v13, v14, v15)])
     }
 
@@ -39,6 +39,14 @@ impl f32x16 {
                     x+1., x+1., x+1., x+1.,
                     x+2., x+2., x+2., x+2.,
                     x+3., x+3., x+3., x+3.)
+    }
+
+    #[inline]
+    pub fn to_array(self) -> [f32; 16] {
+        [self.0[0].0, self.0[0].1, self.0[0].2, self.0[0].3,
+         self.0[1].0, self.0[1].1, self.0[1].2, self.0[1].3,
+         self.0[2].0, self.0[2].1, self.0[2].2, self.0[2].3,
+         self.0[3].0, self.0[3].1, self.0[3].2, self.0[3].3]
     }
 }
 
@@ -86,7 +94,7 @@ impl Div for f32x16 {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Debug)]
 pub struct f32x16_vec2([f32x16; 2]);
 
 impl f32x16_vec2 {
@@ -105,5 +113,31 @@ impl f32x16_vec2 {
     #[inline]
     pub fn dot(self, rhs: f32x16_vec2) -> f32x16 {
         self.0[0] * rhs.0[0] + self.0[1] * rhs.0[1]
+    }
+}
+
+#[derive(Copy, Debug)]
+pub struct f32x16_vec3(pub [f32x16; 3]);
+
+impl f32x16_vec3 {
+    #[inline]
+    pub fn broadcast(v: Vector3<f32>) -> f32x16_vec3 {
+        f32x16_vec3([f32x16::broadcast(v.x),
+                     f32x16::broadcast(v.y),
+                     f32x16::broadcast(v.z)])
+    }
+
+    #[inline]
+    pub fn dot(self, rhs: f32x16_vec3) -> f32x16 {
+        self.0[0] * rhs.0[0] +
+        self.0[1] * rhs.0[1] +
+        self.0[2] * rhs.0[2]
+    }
+
+    #[inline]
+    pub fn to_array(self) -> [[f32; 16]; 3] {
+        [self.0[0].to_array(),
+         self.0[1].to_array(),
+         self.0[2].to_array()]
     }
 }

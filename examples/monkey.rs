@@ -110,7 +110,7 @@ fn main() {
         }
 
         frame.clear();
-        frame.normal_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
+        frame.simd_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
         graphics.device.update_texture(&texture, &image_info, frame.frame.as_slice()).unwrap();
 
         graphics.renderer.blit(&texture_frame,

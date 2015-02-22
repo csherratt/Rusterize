@@ -4,11 +4,14 @@ extern crate image;
 extern crate genmesh;
 extern crate cgmath;
 
+use std::num::Float;
+use std::ops::Range;
+use std::iter::range_step;
+
 use image::{GenericImage, ImageBuffer, Rgb, Luma};
 use cgmath::*;
 use genmesh::{Triangle, MapVertex};
-use std::num::Float;
-use std::ops::Range;
+use group::Group;
 
 pub use pipeline::{Fragment, Vertex};
 pub use interpolate::{Flat, Interpolate};
@@ -258,7 +261,7 @@ impl Barycentric {
 
         let v0 = f32x16_vec2::broadcast(self.v0);
         let v1 = f32x16_vec2::broadcast(self.v1);
-        let v2 = f32x16_vec2::range(p.x, p.y);
+        let v2 = f32x16_vec2::range(v2.x, v2.y);
 
         let d00 = v0.dot(v0);
         let d01 = v0.dot(v1);
@@ -288,6 +291,57 @@ impl Frame {
         }
         for depth in self.depth.as_mut_slice().iter_mut() {
             *depth = 1.;
+        }
+    }
+
+    pub fn simd_raster<S, F, T, O>(&mut self, poly: S, fragment: F)
+        where S: Iterator<Item=Triangle<T>>,
+              T: Clone + Interpolate<Out=O> + FetchPosition,
+              F: Fragment<O, Color=Rgb<u8>> {
+
+        let h = self.frame.height();
+        let w = self.frame.width();
+        let (hf, wf) = (h as f32, w as f32);
+        let (hh, wh) = (hf/2., wf/2.);
+        for or in poly {
+            let t = or.clone().map_vertex(|v| {
+                let v = v.position();
+                Vector4::new(v[0], v[1], v[2], v[3])
+            });
+
+            let clip4 = t.map_vertex(|v| {
+                Vector4::new(
+                    hh * (v.x / v.w) + hh,
+                    wh * (v.y / v.w) + wh,
+                    v.z / v.w,
+                    v.w / v.w
+                )
+            });
+
+            // cull any backface triangles
+            if is_backface(clip4.map_vertex(|v| Vector3::new(v.x, v.y, v.z))) {
+                continue;
+            }
+
+            let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
+            let clip3 = Vector3::new(clip4.x.z, clip4.y.z, clip4.z.z);
+            let bary = Barycentric::new(clip);
+
+            for x in range_step(0, self.frame.width(), 4) {
+                for y in range_step(0, self.frame.height(), 4) {
+                    let off = Vector2::new(x as f32, y as f32);
+                    for (xi, yi, z, w) in Group::new(off, &bary, clip3).iter() {
+                        let x = x + xi as u32;
+                        let y = y + yi as u32;
+                        let &Luma([dz]) = self.depth.get_pixel(x, h-y-1);
+                        if dz > z {
+                            let frag = Interpolate::interpolate(&or, w);
+                            self.frame.put_pixel(x, h-y-1, fragment.fragment(frag));
+                            self.depth.put_pixel(x, h-y-1, Luma([z]));
+                        }
+                    }
+                }
+            }
         }
     }
 

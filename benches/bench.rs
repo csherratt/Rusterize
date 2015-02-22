@@ -137,7 +137,7 @@ fn monkey(bench: &mut Bencher) {
         }
 
         frame.clear();
-        frame.normal_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
+        frame.simd_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
     });
 }
 
@@ -148,17 +148,8 @@ fn buffer_clear(bench: &mut Bencher) {
     bench.iter(|| { frame.clear(); });
 }
 
-
 #[bench]
-fn tile_new(bench: &mut Bencher) {
-
-    bench.iter(|| {
-        black_box(Group::new(Vector2::new(16., 16.)))
-    });
-}
-
-#[bench]
-fn tile_raster(bench: &mut Bencher) {
+fn group_new(bench: &mut Bencher) {
     use rusterize::Barycentric;
     let tri = Triangle::new(Vector4::new(0., 0., 0., 0.),
                             Vector4::new(1., 1., 0., 0.),
@@ -170,9 +161,7 @@ fn tile_raster(bench: &mut Bencher) {
     let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
 
     bench.iter(|| {
-        let mut group = Group::new(Vector2::new(x, y));
-        group.raster(&bary);
-        black_box(group);
+        black_box(Group::new(Vector2::new(x, y), &bary, Vector3::new(0., 0., 0.)));
         x += 1.;
         y += 1.;
     });
