@@ -14,7 +14,7 @@ use genmesh::*;
 use test::{Bencher, black_box};
 use image::Rgb;
 
-const SIZE: u32 = 1024;
+const SIZE: u32 = 256;
 
 struct SetValue(Rgb<u8>);
 
@@ -103,45 +103,6 @@ fn plane_back_front(bench: &mut Bencher) {
 }
 
 #[bench]
-fn monkey(bench: &mut Bencher) {
-    let obj = obj::load(&Path::new("test_assets/monkey.obj")).unwrap();
-    let monkey = obj.object_iter().next().unwrap().group_iter().next().unwrap();
-
-    let proj = ortho(-1.5, 1.5, -1.5, 1.5, -10., 10.);
-
-    let light_normal = Vector4::new(10., 10., 10., 0.).normalize();
-    let kd = Vector4::new(64., 128., 64., 1.);
-    let ka = Vector4::new(16., 16., 16., 1.);
-    let mut frame = Frame::new(SIZE, SIZE);
-
-    bench.iter(|| {
-        let vertex = monkey.indices().iter().map(|x| *x)
-                           .vertex(|(p, _, n)| { (obj.position()[p], obj.normal()[n.unwrap()]) })
-                           .vertex(|(p, n)| (proj.mul_v(&Vector4::new(p[0], p[1], p[2], 1.)).into_fixed(), n))
-                           .triangulate();
-
-        struct V {
-            ka: Vector4<f32>,
-            kd: Vector4<f32>,
-            light_normal: Vector4<f32>
-        }
-
-        impl Fragment<([f32; 4], [f32; 3])> for V {
-            type Color = Rgb<u8>;
-
-            fn fragment(&self, (_, n) : ([f32; 4], [f32; 3])) -> Rgb<u8> {
-                let normal = Vector4::new(n[0], n[1], n[2], 0.);
-                let v = self.kd.mul_s(self.light_normal.dot(&normal).partial_max(0.)) + self.ka;
-                Rgb([v.x as u8, v.y as u8, v.z as u8])
-            }
-        }
-
-        frame.clear();
-        frame.simd_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
-    });
-}
-
-#[bench]
 fn buffer_clear(bench: &mut Bencher) {
     let mut frame = Frame::new(SIZE, SIZE);
 
@@ -164,5 +125,92 @@ fn group_new(bench: &mut Bencher) {
         black_box(Group::new(Vector2::new(x, y), &bary, Vector3::new(0., 0., 0.)));
         x += 1.;
         y += 1.;
+    });
+}
+
+struct V {
+    ka: Vector4<f32>,
+    kd: Vector4<f32>,
+    light_normal: Vector4<f32>
+}
+
+impl Fragment<([f32; 4], [f32; 3])> for V {
+    type Color = Rgb<u8>;
+
+    fn fragment(&self, (_, n) : ([f32; 4], [f32; 3])) -> Rgb<u8> {
+        let normal = Vector4::new(n[0], n[1], n[2], 0.);
+        let v = self.kd.mul_s(self.light_normal.dot(&normal).partial_max(0.)) + self.ka;
+        Rgb([v.x as u8, v.y as u8, v.z as u8])
+    }
+}
+
+#[bench]
+fn monkey_normal(bench: &mut Bencher) {
+    let obj = obj::load(&Path::new("test_assets/monkey.obj")).unwrap();
+    let monkey = obj.object_iter().next().unwrap().group_iter().next().unwrap();
+
+    let proj = ortho(-1.5, 1.5, -1.5, 1.5, -10., 10.);
+
+    let light_normal = Vector4::new(10., 10., 10., 0.).normalize();
+    let kd = Vector4::new(64., 128., 64., 1.);
+    let ka = Vector4::new(16., 16., 16., 1.);
+    let mut frame = Frame::new(SIZE, SIZE);
+
+    bench.iter(|| {
+        let vertex = monkey.indices().iter().map(|x| *x)
+                           .vertex(|(p, _, n)| { (obj.position()[p], obj.normal()[n.unwrap()]) })
+                           .vertex(|(p, n)| (proj.mul_v(&Vector4::new(p[0], p[1], p[2], 1.)).into_fixed(), n))
+                           .triangulate();
+
+        frame.clear();
+        frame.normal_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
+    });
+}
+
+#[bench]
+fn monkey_simd(bench: &mut Bencher) {
+    let obj = obj::load(&Path::new("test_assets/monkey.obj")).unwrap();
+    let monkey = obj.object_iter().next().unwrap().group_iter().next().unwrap();
+
+    let proj = ortho(-1.5, 1.5, -1.5, 1.5, -10., 10.);
+
+    let light_normal = Vector4::new(10., 10., 10., 0.).normalize();
+    let kd = Vector4::new(64., 128., 64., 1.);
+    let ka = Vector4::new(16., 16., 16., 1.);
+    let mut frame = Frame::new(SIZE, SIZE);
+
+    bench.iter(|| {
+        frame.clear();
+        let vertex = monkey.indices().iter().map(|x| *x)
+                           .vertex(|(p, _, n)| { (obj.position()[p], obj.normal()[n.unwrap()]) })
+                           .vertex(|(p, n)| (proj.mul_v(&Vector4::new(p[0], p[1], p[2], 1.)).into_fixed(), n))
+                           .triangulate();
+
+        frame.clear();
+        frame.simd_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
+    });
+}
+
+#[bench]
+fn monkey_debug(bench: &mut Bencher) {
+    let obj = obj::load(&Path::new("test_assets/monkey.obj")).unwrap();
+    let monkey = obj.object_iter().next().unwrap().group_iter().next().unwrap();
+
+    let proj = ortho(-1.5, 1.5, -1.5, 1.5, -10., 10.);
+
+    let light_normal = Vector4::new(10., 10., 10., 0.).normalize();
+    let kd = Vector4::new(64., 128., 64., 1.);
+    let ka = Vector4::new(16., 16., 16., 1.);
+    let mut frame = Frame::new(SIZE, SIZE);
+
+    bench.iter(|| {
+        frame.clear();
+        let vertex = monkey.indices().iter().map(|x| *x)
+                           .vertex(|(p, _, n)| { (obj.position()[p], obj.normal()[n.unwrap()]) })
+                           .vertex(|(p, n)| (proj.mul_v(&Vector4::new(p[0], p[1], p[2], 1.)).into_fixed(), n))
+                           .triangulate();
+
+        frame.clear();
+        frame.debug_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
     });
 }
