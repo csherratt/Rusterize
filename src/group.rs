@@ -31,10 +31,9 @@ impl Group {
     }
 
     #[inline]
-    pub fn raster(&mut self, clip: &Triangle<Vector4<f32>>) {
-        let bary = Barycentric::new(clip.map_vertex(|v| Vector2::new(v.x, v.y)));
-        let [u, v] = bary.coordinate_f32x16(self.pos);
-        self.u = u;
-        self.v = v;
+    pub fn raster(&mut self, bary: &Barycentric) {
+        match bary.coordinate_f32x16(self.pos) {
+            [u, v] => { self.u = u; self.v = v; }
+        }
     }
 }

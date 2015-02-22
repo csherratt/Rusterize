@@ -117,7 +117,7 @@ fn random_triangles() {
         println!("{} {:?}", i, triangle);
 
         expected.debug_raster(triangle.iter().map(|x| *x), SetValue(Rgb([255, 255, 255])));
-        result.raster(triangle.iter().map(|x| *x), SetValue(Rgb([255, 255, 255])));
+        result.normal_raster(triangle.iter().map(|x| *x), SetValue(Rgb([255, 255, 255])));
 
         save(format!("random_{}", i), expected, result);
     }

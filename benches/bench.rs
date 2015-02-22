@@ -10,8 +10,7 @@ extern crate obj;
 use rusterize::{Frame, Fragment};
 use rusterize::group::Group;
 use cgmath::*;
-use genmesh::generators;
-use genmesh::{Triangulate, MapToVertices, Triangle};
+use genmesh::*;
 use test::{Bencher, black_box};
 use image::Rgb;
 
@@ -32,7 +31,7 @@ fn plane_simple(bench: &mut Bencher) {
     bench.iter(|| {
         frame.clear();
         let plane = generators::Plane::new();
-        frame.raster(plane.triangulate()
+        frame.normal_raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
             SetValue(Rgb([255, 255, 255]))
         );
@@ -46,7 +45,7 @@ fn plane_subdivide(bench: &mut Bencher) {
     bench.iter(|| {
         frame.clear();
         let plane = generators::Plane::subdivide(128, 128);
-        frame.raster(plane.triangulate()
+        frame.normal_raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
             SetValue(Rgb([255, 255, 255]))
         );
@@ -60,7 +59,7 @@ fn plane_backface(bench: &mut Bencher) {
     bench.iter(|| {
         frame.clear();
         let plane = generators::Plane::new();
-        frame.raster(plane.triangulate()
+        frame.normal_raster(plane.triangulate()
                           .vertex(|v| Vector4::new(-v.0, v.1, 0., 1.).into_fixed()),
             SetValue(Rgb([255, 255, 255]))
         );
@@ -74,11 +73,11 @@ fn plane_front_back(bench: &mut Bencher) {
     bench.iter(|| {
         frame.clear();
         let plane = generators::Plane::new();
-        frame.raster(plane.triangulate()
+        frame.normal_raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 1., 1.).into_fixed()),
             SetValue(Rgb([255, 255, 255]))
         );
-        frame.raster(plane.triangulate()
+        frame.normal_raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
             SetValue(Rgb([255, 255, 255]))
         );
@@ -92,11 +91,11 @@ fn plane_back_front(bench: &mut Bencher) {
     bench.iter(|| {
         frame.clear();
         let plane = generators::Plane::new();
-        frame.raster(plane.triangulate()
+        frame.normal_raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
             SetValue(Rgb([255, 255, 255]))
         );
-        frame.raster(plane.triangulate()
+        frame.normal_raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 1., 1.).into_fixed()),
             SetValue(Rgb([255, 255, 255]))
         );
@@ -138,7 +137,7 @@ fn monkey(bench: &mut Bencher) {
         }
 
         frame.clear();
-        frame.raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
+        frame.normal_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
     });
 }
 
@@ -160,6 +159,7 @@ fn tile_new(bench: &mut Bencher) {
 
 #[bench]
 fn tile_raster(bench: &mut Bencher) {
+    use rusterize::Barycentric;
     let tri = Triangle::new(Vector4::new(0., 0., 0., 0.),
                             Vector4::new(1., 1., 0., 0.),
                             Vector4::new(0., 1., 0., 0.));
@@ -167,9 +167,11 @@ fn tile_raster(bench: &mut Bencher) {
     let mut x = 0.;
     let mut y = 0.;
 
+    let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
+
     bench.iter(|| {
         let mut group = Group::new(Vector2::new(x, y));
-        group.raster(&tri);
+        group.raster(&bary);
         black_box(group);
         x += 1.;
         y += 1.;

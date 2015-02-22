@@ -291,7 +291,7 @@ impl Frame {
         }
     }
 
-    pub fn raster<S, F, T, O>(&mut self, poly: S, fragment: F)
+    pub fn normal_raster<S, F, T, O>(&mut self, poly: S, fragment: F)
         where S: Iterator<Item=Triangle<T>>,
               T: Clone + Interpolate<Out=O> + FetchPosition,
               F: Fragment<O, Color=Rgb<u8>> {
