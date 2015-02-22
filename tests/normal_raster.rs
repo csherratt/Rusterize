@@ -95,31 +95,3 @@ fn bottom_right_angle_1() {
     assert_eq!(top.next(), Some((2, Scanline::new(1., 3.))));
     assert_eq!(top.next(), Some((3, Scanline::new(0., 3.))));
 }
-
-struct SetValue(Rgb<u8>);
-
-impl Fragment<[f32; 4]> for SetValue {
-    type Color = Rgb<u8>;
-
-    fn fragment(&self, _: [f32; 4]) -> Rgb<u8> { self.0 }
-}
-
-#[test]
-fn random_triangles() {
-    for i in (0..100) {
-        let mut expected = Frame::new(64, 64);
-        let mut result = Frame::new(64, 64);
-        let triangle = Some(Triangle::new(
-            [thread_rng().gen_range(-1f32, 1.), thread_rng().gen_range(-1f32, 1.), 0., 1.],
-            [thread_rng().gen_range(-1f32, 1.), thread_rng().gen_range(-1f32, 1.), 0., 1.],
-            [thread_rng().gen_range(-1f32, 1.), thread_rng().gen_range(-1f32, 1.), 0., 1.]
-        ));
-        println!("{} {:?}", i, triangle);
-
-        expected.debug_raster(triangle.iter().map(|x| *x), SetValue(Rgb([255, 255, 255])));
-        result.normal_raster(triangle.iter().map(|x| *x), SetValue(Rgb([255, 255, 255])));
-
-        save(format!("random_{}", i), expected, result);
-    }
-
-}
