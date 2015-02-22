@@ -14,7 +14,7 @@ use genmesh::*;
 use test::{Bencher, black_box};
 use image::Rgb;
 
-const SIZE: u32 = 256;
+const SIZE: u32 = 1024;
 
 struct SetValue(Rgb<u8>);
 

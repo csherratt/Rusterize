@@ -324,11 +324,24 @@ impl Frame {
             }
 
             let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
+
+            let max_x = clip.x.x.ceil().partial_max(clip.y.x.ceil().partial_max(clip.z.x.ceil())).partial_max(0.).partial_min(hf);
+            let min_x = clip.x.x.floor().partial_min(clip.y.x.floor().partial_min(clip.z.x.floor())).partial_max(0.).partial_min(hf);
+            let max_y = clip.x.y.ceil().partial_max(clip.y.y.ceil().partial_max(clip.z.y.ceil())).partial_max(0.).partial_min(wf);
+            let min_y = clip.x.y.floor().partial_min(clip.y.y.floor().partial_min(clip.z.y.floor())).partial_max(0.).partial_min(wf);
+
+            let min_x = min_x as u32 & 0xFFFFFFFC;
+            let min_y = min_y as u32 & 0xFFFFFFFC;
+            let max_x = max_x as u32;
+            let max_y = max_y as u32;
+            let max_x = if max_x & 0x3 != 0 { max_x + (0x4 - (max_x & 0x3)) } else { max_x };
+            let max_y = if max_y & 0x3 != 0 { max_y + (0x4 - (max_y & 0x3)) } else { max_y };
+
             let clip3 = Vector3::new(clip4.x.z, clip4.y.z, clip4.z.z);
             let bary = Barycentric::new(clip);
 
-            for x in range_step(0, self.frame.width(), 4) {
-                for y in range_step(0, self.frame.height(), 4) {
+            for x in range_step(min_x, max_x, 4) {
+                for y in range_step(min_y, max_y, 4) {
                     let off = Vector2::new(x as f32, y as f32);
                     for (xi, yi, z, w) in Group::new(off, &bary, clip3).iter() {
                         let x = x + xi as u32;
