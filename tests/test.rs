@@ -109,7 +109,7 @@ fn plane_back_front() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 1., 1.)).into_fixed());
 
-    frame.raster(cube, SetValue(Rgb([255, 255, 255])));
+    frame.raster(cube, SetValue(Rgb([128, 128, 128])));
 
     check("plane_back_front", frame);
 }

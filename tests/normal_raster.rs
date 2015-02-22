@@ -11,7 +11,8 @@ use genmesh::Triangle;
 use rusterize::{
     FlatTriangleIter,
     Scanline,
-    Frame
+    Frame,
+    Fragment
 };
 use cgmath::*;
 use image::Rgb;
@@ -95,6 +96,14 @@ fn bottom_right_angle_1() {
     assert_eq!(top.next(), Some((3, Scanline::new(0., 3.))));
 }
 
+struct SetValue(Rgb<u8>);
+
+impl Fragment<[f32; 4]> for SetValue {
+    type Color = Rgb<u8>;
+
+    fn fragment(&self, _: [f32; 4]) -> Rgb<u8> { self.0 }
+}
+
 #[test]
 fn random_triangles() {
     for i in (0..100) {
@@ -107,12 +116,8 @@ fn random_triangles() {
         ));
         println!("{} {:?}", i, triangle);
 
-        expected.debug_raster(triangle.iter().map(|x| *x), |_| {
-            Rgb([255, 255, 255])
-        });
-        result.raster(triangle.iter().map(|x| *x), |_| {
-            Rgb([255, 255, 255])
-        });
+        expected.debug_raster(triangle.iter().map(|x| *x), SetValue(Rgb([255, 255, 255])));
+        result.raster(triangle.iter().map(|x| *x), SetValue(Rgb([255, 255, 255])));
 
         save(format!("random_{}", i), expected, result);
     }

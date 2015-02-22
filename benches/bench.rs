@@ -8,7 +8,7 @@ extern crate test;
 extern crate obj;
 
 use rusterize::{Frame, Fragment};
-use rusterize::tile::Tile;
+use rusterize::group::Group;
 use cgmath::*;
 use genmesh::generators;
 use genmesh::{Triangulate, MapToVertices, Triangle};
@@ -152,10 +152,9 @@ fn buffer_clear(bench: &mut Bencher) {
 
 #[bench]
 fn tile_new(bench: &mut Bencher) {
-    let mut tile = Tile::new();
 
     bench.iter(|| {
-        black_box(Tile::new())
+        black_box(Group::new(Vector2::new(16., 16.)))
     });
 }
 
@@ -164,9 +163,15 @@ fn tile_raster(bench: &mut Bencher) {
     let tri = Triangle::new(Vector4::new(0., 0., 0., 0.),
                             Vector4::new(1., 1., 0., 0.),
                             Vector4::new(0., 1., 0., 0.));
-    let mut tile = Tile::new();
+
+    let mut x = 0.;
+    let mut y = 0.;
 
     bench.iter(|| {
-        black_box(tile.raster(&tri));
+        let mut group = Group::new(Vector2::new(x, y));
+        group.raster(&tri);
+        black_box(group);
+        x += 1.;
+        y += 1.;
     });
 }

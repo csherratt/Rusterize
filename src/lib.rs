@@ -10,12 +10,13 @@ use genmesh::{Triangle, MapVertex};
 use std::num::Float;
 use std::ops::Range;
 
-pub mod tile;
 pub use pipeline::{Fragment, Vertex};
 pub use interpolate::{Flat, Interpolate};
 
 mod interpolate;
 mod pipeline;
+mod f32x16;
+pub mod group;
 
 #[cfg(dump)]
 fn dump(idx: usize, frame: &Frame) {
@@ -249,6 +250,28 @@ impl Barycentric {
             v: v
         }
     }
+
+    #[inline]
+    pub fn coordinate_f32x16(&self, p: Vector2<f32>) -> [f32x16::f32x16; 2] {
+        use f32x16::{f32x16, f32x16_vec2};
+        let v2 = p - self.base;
+
+        let v0 = f32x16_vec2::broadcast(self.v0);
+        let v1 = f32x16_vec2::broadcast(self.v1);
+        let v2 = f32x16_vec2::range(p.x, p.y);
+
+        let d00 = v0.dot(v0);
+        let d01 = v0.dot(v1);
+        let d02 = v0.dot(v2);
+        let d11 = v1.dot(v1);
+        let d12 = v1.dot(v2);
+
+        let inv_denom = f32x16::broadcast(self.inv_denom);
+
+        [(d11 * d02 - d01 * d12) * inv_denom,
+         (d00 * d12 - d01 * d02) * inv_denom]
+
+    }
 }
 
 impl Frame {
@@ -325,10 +348,11 @@ impl Frame {
     }
 
     /// This is an extramly slow render that is designed to find missing fragments.
-    pub fn debug_raster<S, F, T, O>(&mut self, poly: S, mut fragment: F)
+    pub fn debug_raster<S, F, T, O>(&mut self, poly: S, fragment: F)
         where S: Iterator<Item=Triangle<T>>,
-              F: FnMut<(O,), Output=Rgb<u8>>,
-              T: FetchPosition + Clone + Interpolate<Out=O> {
+              T: Clone + Interpolate<Out=O> + FetchPosition,
+              F: Fragment<O, Color=Rgb<u8>> {
+
         let h = self.frame.height();
         let w = self.frame.width();
         let (hf, wf) = (h as f32, w as f32);
@@ -369,7 +393,7 @@ impl Frame {
 
                     if cood.inside() && z >= -1. && dz[0] > z {
                         let frag = Interpolate::interpolate(&or, w);
-                        self.frame.put_pixel(x, h-y-1, fragment(frag));
+                        self.frame.put_pixel(x, h-y-1, fragment.fragment(frag));
                         self.depth.put_pixel(x, h-y-1, Luma([z]));
                     }
                 }
