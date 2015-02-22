@@ -1,9 +1,12 @@
-use std::simd::*;
 use std::ops::*;
 use cgmath::*;
 
 #[derive(Copy, Debug)]
-pub struct f32x16(pub [f32x4; 4]);
+#[simd]
+pub struct f32x16(pub f32, pub f32, pub f32, pub f32,
+                  pub f32, pub f32, pub f32, pub f32,
+                  pub f32, pub f32, pub f32, pub f32,
+                  pub f32, pub f32, pub f32, pub f32);
 
 impl f32x16 {
     #[inline]
@@ -11,86 +14,42 @@ impl f32x16 {
                v4: f32,  v5: f32,  v6: f32,  v7: f32,
                v8: f32,  v9: f32,  v10: f32, v11: f32,
                v12: f32, v13: f32, v14: f32, v15: f32) -> f32x16 {
-        f32x16([f32x4(v0,  v1,  v2,  v3),
-                f32x4(v4,  v5,  v6,  v7),
-                f32x4(v8,  v9,  v10, v11),
-                f32x4(v12, v13, v14, v15)])
+        f32x16(v0,  v1,  v2,  v3,
+               v4,  v5,  v6,  v7,
+               v8,  v9,  v10, v11,
+               v12, v13, v14, v15)
     }
 
     #[inline]
     pub fn broadcast(v: f32) -> f32x16 {
-        f32x16::new(v, v, v, v,
-                    v, v, v, v,
-                    v, v, v, v,
-                    v, v, v, v)
+        f32x16(v, v, v, v,
+               v, v, v, v,
+               v, v, v, v,
+               v, v, v, v)
     }
 
     #[inline]
-    pub fn range_x_4x4(x: f32) -> f32x16 {
-        f32x16::new(x, x+1., x+2., x+3.,
-                    x, x+1., x+2., x+3.,
-                    x, x+1., x+2., x+3.,
-                    x, x+1., x+2., x+3.)
+    pub fn range_x() -> f32x16 {
+        f32x16(0., 1., 2., 3.,
+               0., 1., 2., 3.,
+               0., 1., 2., 3.,
+               0., 1., 2., 3.)
     }
 
     #[inline]
-    pub fn range_y_4x4(x: f32) -> f32x16 {
-        f32x16::new(x, x, x, x,
-                    x+1., x+1., x+1., x+1.,
-                    x+2., x+2., x+2., x+2.,
-                    x+3., x+3., x+3., x+3.)
+    pub fn range_y() -> f32x16 {
+        f32x16(0., 0., 0., 0.,
+               1., 1., 1., 1.,
+               2., 2., 2., 2.,
+               3., 3., 3., 3.)
     }
 
     #[inline]
     pub fn to_array(self) -> [f32; 16] {
-        [self.0[0].0, self.0[0].1, self.0[0].2, self.0[0].3,
-         self.0[1].0, self.0[1].1, self.0[1].2, self.0[1].3,
-         self.0[2].0, self.0[2].1, self.0[2].2, self.0[2].3,
-         self.0[3].0, self.0[3].1, self.0[3].2, self.0[3].3]
-    }
-}
-
-impl Add for f32x16 {
-    type Output = f32x16;
-    #[inline]
-    fn add(self, rhs: f32x16) -> f32x16 {
-        f32x16([self.0[0] + rhs.0[0],
-                self.0[1] + rhs.0[1],
-                self.0[2] + rhs.0[2],
-                self.0[3] + rhs.0[3]])
-    }
-}
-
-impl Sub for f32x16 {
-    type Output = f32x16;
-    #[inline]
-    fn sub(self, rhs: f32x16) -> f32x16 {
-        f32x16([self.0[0] - rhs.0[0],
-                self.0[1] - rhs.0[1],
-                self.0[2] - rhs.0[2],
-                self.0[3] - rhs.0[3]])
-    }
-}
-
-impl Mul for f32x16 {
-    type Output = f32x16;
-    #[inline]
-    fn mul(self, rhs: f32x16) -> f32x16 {
-        f32x16([self.0[0] * rhs.0[0],
-                self.0[1] * rhs.0[1],
-                self.0[2] * rhs.0[2],
-                self.0[3] * rhs.0[3]])
-    }
-}
-
-impl Div for f32x16 {
-    type Output = f32x16;
-    #[inline]
-    fn div(self, rhs: f32x16) -> f32x16 {
-        f32x16([self.0[0] / rhs.0[0],
-                self.0[1] / rhs.0[1],
-                self.0[2] / rhs.0[2],
-                self.0[3] / rhs.0[3]])
+        [self.0,  self.1,  self.2,  self.3,
+         self.4,  self.5,  self.6,  self.7,
+         self.8,  self.9,  self.10, self.11,
+         self.12, self.13, self.14, self.15]
     }
 }
 
@@ -105,9 +64,9 @@ impl f32x16_vec2 {
     }
 
     #[inline]
-    pub fn range(x: f32, y: f32) -> f32x16_vec2 {
-        f32x16_vec2([f32x16::range_x_4x4(x),
-                     f32x16::range_y_4x4(y)])
+    pub fn range(x: f32, y: f32, xs: f32, ys: f32) -> f32x16_vec2 {
+        f32x16_vec2([f32x16::range_x() * f32x16::broadcast(xs) + f32x16::broadcast(x),
+                     f32x16::range_y() * f32x16::broadcast(ys) + f32x16::broadcast(y)])
     }
 
     #[inline]

@@ -180,7 +180,6 @@ fn monkey_simd(bench: &mut Bencher) {
     let mut frame = Frame::new(SIZE, SIZE);
 
     bench.iter(|| {
-        frame.clear();
         let vertex = monkey.indices().iter().map(|x| *x)
                            .vertex(|(p, _, n)| { (obj.position()[p], obj.normal()[n.unwrap()]) })
                            .vertex(|(p, n)| (proj.mul_v(&Vector4::new(p[0], p[1], p[2], 1.)).into_fixed(), n))
@@ -204,7 +203,6 @@ fn monkey_debug(bench: &mut Bencher) {
     let mut frame = Frame::new(SIZE, SIZE);
 
     bench.iter(|| {
-        frame.clear();
         let vertex = monkey.indices().iter().map(|x| *x)
                            .vertex(|(p, _, n)| { (obj.position()[p], obj.normal()[n.unwrap()]) })
                            .vertex(|(p, n)| (proj.mul_v(&Vector4::new(p[0], p[1], p[2], 1.)).into_fixed(), n))
