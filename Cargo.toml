@@ -16,7 +16,6 @@ git = "https://github.com/PistonDevelopers/image"
 
 [dependencies]
 obj="*"
-gfx="*"
 glfw="*"
 time="*"
 rand="*"
@@ -24,3 +23,6 @@ rand="*"
 [[example]]
 name = "monkey"
 path = "examples/monkey.rs"
+
+[dependencies.gfx]
+git = "https://github.com/gfx-rs/gfx-rs.git"
