@@ -1,4 +1,5 @@
 use std::ops::*;
+use std::mem;
 use cgmath::*;
 
 #[derive(Copy, Debug)]
@@ -37,11 +38,23 @@ impl f32x16 {
     }
 
     #[inline]
+    pub fn range_x2() -> f32x16 {
+        f32x16(0., 1., 2., 3., 4., 5., 6., 7.,
+               0., 1., 2., 3., 4., 5., 6., 7.)
+    }
+
+    #[inline]
     pub fn range_y() -> f32x16 {
         f32x16(0., 0., 0., 0.,
                1., 1., 1., 1.,
                2., 2., 2., 2.,
                3., 3., 3., 3.)
+    }
+
+    #[inline]
+    pub fn range_y2() -> f32x16 {
+        f32x16(0., 0., 0., 0., 0., 0., 0., 0.,
+               1., 1., 1., 1., 1., 1., 1., 1.)
     }
 
     #[inline]
@@ -98,5 +111,47 @@ impl f32x16_vec3 {
         [self.0[0].to_array(),
          self.0[1].to_array(),
          self.0[2].to_array()]
+    }
+
+    /// casts a each f32 to its bit forms as u32
+    /// this is numerically useless, but used for bit twiddling
+    /// inside of the library
+    #[inline]
+    pub fn to_bit_u32x16_vec3(self) -> u32x16_vec3 {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+#[derive(Copy, Debug)]
+pub struct u32x16_vec3(pub [u32x16; 3]);
+
+impl u32x16_vec3 {
+    #[inline]
+    pub fn or_vec(self) -> u32x16 {
+        let u32x16_vec3([a, b, c]) = self;
+        a | b | c
+    }
+}
+
+#[derive(Copy, Debug)]
+#[simd]
+pub struct u32x16(pub u32, pub u32, pub u32, pub u32,
+                  pub u32, pub u32, pub u32, pub u32,
+                  pub u32, pub u32, pub u32, pub u32,
+                  pub u32, pub u32, pub u32, pub u32);
+
+impl u32x16 {
+    #[inline]
+    pub fn broadcast(v: u32) -> u32x16 {
+      u32x16(v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v)
+    }
+
+    #[inline]
+    pub fn or_self(self) -> u32 {
+        let u32x16(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) = self;
+        a | b | c | d |
+        e | f | g | h |
+        i | j | k | l |
+        m | n | o | p 
     }
 }

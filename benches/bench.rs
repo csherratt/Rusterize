@@ -212,3 +212,73 @@ fn monkey_debug(bench: &mut Bencher) {
         frame.debug_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
     });
 }
+
+#[bench]
+fn trailing_zeros(bench: &mut Bencher) {
+    use std::num::Int;
+    let mut i = 0u64;
+    bench.iter(|| {
+        black_box(if i.trailing_zeros() >= 16 { 0 } else { 1 });
+        i += 1;
+    });
+}
+
+#[bench]
+fn barycentric_f32x4(bench: &mut Bencher) {
+    use rusterize::Barycentric;
+
+    let tri = Triangle::new(Vector4::new(0., 0., 0., 0.),
+                            Vector4::new(1., 1., 0., 0.),
+                            Vector4::new(0., 1., 0., 0.));
+
+    let mut x = 0.;
+    let mut y = 0.;
+
+    let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
+
+    bench.iter(|| {
+        black_box(bary.coordinate_f32x4(Vector2::new(x, y), Vector2::new(1., 1.0)));
+        x += 1.;
+        y += 1.;
+    });
+}
+
+#[bench]
+fn barycentric_f32x16(bench: &mut Bencher) {
+    use rusterize::Barycentric;
+
+    let tri = Triangle::new(Vector4::new(0., 0., 0., 0.),
+                            Vector4::new(1., 1., 0., 0.),
+                            Vector4::new(0., 1., 0., 0.));
+
+    let mut x = 0.;
+    let mut y = 0.;
+
+    let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
+
+    bench.iter(|| {
+        black_box(bary.coordinate_f32x16(Vector2::new(x, y), Vector2::new(1., 1.)));
+        x += 1.;
+        y += 1.;
+    });
+}
+
+#[bench]
+fn barycentric_f32x64(bench: &mut Bencher) {
+    use rusterize::Barycentric;
+
+    let tri = Triangle::new(Vector4::new(0., 0., 0., 0.),
+                            Vector4::new(1., 1., 0., 0.),
+                            Vector4::new(0., 1., 0., 0.));
+
+    let mut x = 0.;
+    let mut y = 0.;
+
+    let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
+
+    bench.iter(|| {
+        black_box(bary.coordinate_f32x64(Vector2::new(x, y), Vector2::new(1., 1.)));
+        x += 1.;
+        y += 1.;
+    });
+}

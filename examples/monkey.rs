@@ -102,6 +102,7 @@ fn main() {
         impl Fragment<([f32; 4], [f32; 3])> for V {
             type Color = Rgb<u8>;
 
+            #[inline(never)]
             fn fragment(&self, (_, n) : ([f32; 4], [f32; 3])) -> Rgb<u8> {
                 let normal = Vector4::new(n[0], n[1], n[2], 0.);
                 let v = self.kd.mul_s(self.light_normal.dot(&normal).partial_max(0.)) + self.ka;

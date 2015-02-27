@@ -13,6 +13,7 @@ use image::{GenericImage, ImageBuffer, Rgb, Luma};
 use cgmath::*;
 use genmesh::{Triangle, MapVertex};
 use group::Group;
+use vmath::Dot;
 
 pub use pipeline::{Fragment, Vertex};
 pub use interpolate::{Flat, Interpolate};
@@ -20,9 +21,11 @@ pub use interpolate::{Flat, Interpolate};
 mod interpolate;
 mod pipeline;
 mod f32x4;
+mod f32x8;
 mod f32x16;
 mod f32x64;
 mod tile;
+mod vmath;
 pub mod group;
 
 
@@ -321,6 +324,27 @@ impl Barycentric {
         [(d11 * d02 - d01 * d12) * inv_denom,
          (d00 * d12 - d01 * d02) * inv_denom]
     }
+
+    #[inline]
+    pub fn coordinate_f32x8x8(&self, p: Vector2<f32>, s: Vector2<f32>) -> [f32x8::f32x8x8; 2] {
+        use f32x8::{f32x8x8, f32x8x8_vec2};
+        let v2 = p - self.base;
+
+        let v0 = f32x8x8_vec2::broadcast(self.v0);
+        let v1 = f32x8x8_vec2::broadcast(self.v1);
+        let v2 = f32x8x8_vec2::range(v2.x, v2.y, s.x, s.y);
+
+        let d00 = v0.dot(v0);
+        let d01 = v0.dot(v1);
+        let d02 = v0.dot(v2);
+        let d11 = v1.dot(v1);
+        let d12 = v1.dot(v2);
+
+        let inv_denom = f32x8x8::broadcast(self.inv_denom);
+
+        [(d11 * d02 - d01 * d12) * inv_denom,
+         (d00 * d12 - d01 * d02) * inv_denom]
+    }
 }
 
 impl Frame {
@@ -376,18 +400,18 @@ impl Frame {
             let max_y = clip.x.y.ceil().partial_max(clip.y.y.ceil().partial_max(clip.z.y.ceil())).partial_max(0.).partial_min(wf);
             let min_y = clip.x.y.floor().partial_min(clip.y.y.floor().partial_min(clip.z.y.floor())).partial_max(0.).partial_min(wf);
 
-            let min_x = min_x as u32 & 0xFFFFFFFE;
-            let min_y = min_y as u32 & 0xFFFFFFFE;
+            let min_x = min_x as u32 & 0xFFFFFFF8;
+            let min_y = min_y as u32 & 0xFFFFFFF8;
             let max_x = max_x as u32;
             let max_y = max_y as u32;
-            let max_x = if max_x & 0x1 != 0 { max_x + (0x2 - (max_x & 0x1)) } else { max_x };
-            let max_y = if max_y & 0x1 != 0 { max_y + (0x2 - (max_y & 0x1)) } else { max_y };
+            let max_x = if max_x & 0x7 != 0 { max_x + (0x8 - (max_x & 0x7)) } else { max_x };
+            let max_y = if max_y & 0x7 != 0 { max_y + (0x8 - (max_y & 0x7)) } else { max_y };
 
             let clip3 = Vector3::new(clip4.x.z, clip4.y.z, clip4.z.z);
             let bary = Barycentric::new(clip);
 
-            for x in range_step(min_x, max_x, 2) {
-                for y in range_step(min_y, max_y, 2) {
+            for x in range_step(min_x, max_x, 8) {
+                for y in range_step(min_y, max_y, 8) {
                     let off = Vector2::new(x as f32, y as f32);
                     for (xi, yi, z, w) in Group::new(off, &bary, clip3).iter() {
                         let x = x + xi as u32;
