@@ -33,7 +33,7 @@ impl Group {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn mask_with_depth(mut self, z: Vector3<f32>, d: &mut f32x8x8) -> Group {
         let z = f32x8x8_vec3::broadcast(Vector3::new(z.x, z.y, z.z));
         let depth = self.weights.dot(z);

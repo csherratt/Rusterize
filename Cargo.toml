@@ -19,6 +19,8 @@ obj="*"
 glfw="*"
 time="*"
 rand="*"
+simd="*"
+llvmint="*"
 
 [[example]]
 name = "monkey"

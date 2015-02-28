@@ -275,9 +275,9 @@ fn full_mask(bench: &mut Bencher) {
     let mut y = 0.;
 
     let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
+    let mut depth = f32x8x8::broadcast(x);
 
     bench.iter(|| {
-        let mut depth = f32x8x8::broadcast(x);
         black_box(Group::new(Vector2::new(x, y), &bary)
                         .mask_with_depth(Vector3::new(x, y, x), &mut depth));
         x += 1.;

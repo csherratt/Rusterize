@@ -4,6 +4,7 @@
 extern crate image;
 extern crate genmesh;
 extern crate cgmath;
+extern crate simd;
 
 use std::num::Float;
 use std::ops::Range;
@@ -282,7 +283,7 @@ impl Barycentric {
          (d00 * d12 - d01 * d02) * inv_denom]
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn coordinate_f32x8x8(&self, p: Vector2<f32>, s: Vector2<f32>) -> [f32x8::f32x8x8; 2] {
         use f32x8::{f32x8x8, f32x8x8_vec2};
         let v2 = p - self.base;
