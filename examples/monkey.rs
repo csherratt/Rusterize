@@ -20,7 +20,7 @@ use cgmath::*;
 use time::precise_time_s;
 use std::num::Float;
 
-const SIZE: u32 = 1024;
+const SIZE: u32 = 2048;
 
 fn main() {
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS)

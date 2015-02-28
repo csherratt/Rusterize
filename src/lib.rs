@@ -1,5 +1,5 @@
-#![feature(simd)]
-#![feature(unboxed_closures)]
+#![feature(simd, unboxed_closures, core)]
+#![allow(non_camel_case_types)]
 
 extern crate image;
 extern crate genmesh;
@@ -22,10 +22,7 @@ pub use interpolate::{Flat, Interpolate};
 mod interpolate;
 mod pipeline;
 mod f32x4;
-mod f32x8;
-mod f32x16;
-mod f32x64;
-mod tile;
+pub mod f32x8;
 mod vmath;
 pub mod group;
 
@@ -286,48 +283,6 @@ impl Barycentric {
     }
 
     #[inline]
-    pub fn coordinate_f32x16(&self, p: Vector2<f32>, s: Vector2<f32>) -> [f32x16::f32x16; 2] {
-        use f32x16::{f32x16, f32x16_vec2};
-        let v2 = p - self.base;
-
-        let v0 = f32x16_vec2::broadcast(self.v0);
-        let v1 = f32x16_vec2::broadcast(self.v1);
-        let v2 = f32x16_vec2::range(v2.x, v2.y, s.x, s.y);
-
-        let d00 = v0.dot(v0);
-        let d01 = v0.dot(v1);
-        let d02 = v0.dot(v2);
-        let d11 = v1.dot(v1);
-        let d12 = v1.dot(v2);
-
-        let inv_denom = f32x16::broadcast(self.inv_denom);
-
-        [(d11 * d02 - d01 * d12) * inv_denom,
-         (d00 * d12 - d01 * d02) * inv_denom]
-    }
-
-    #[inline]
-    pub fn coordinate_f32x64(&self, p: Vector2<f32>, s: Vector2<f32>) -> [f32x64::f32x64; 2] {
-        use f32x64::{f32x64, f32x64_vec2};
-        let v2 = p - self.base;
-
-        let v0 = f32x64_vec2::broadcast(self.v0);
-        let v1 = f32x64_vec2::broadcast(self.v1);
-        let v2 = f32x64_vec2::range(v2.x, v2.y, s.x, s.y);
-
-        let d00 = v0.dot(v0);
-        let d01 = v0.dot(v1);
-        let d02 = v0.dot(v2);
-        let d11 = v1.dot(v1);
-        let d12 = v1.dot(v2);
-
-        let inv_denom = f32x64::broadcast(self.inv_denom);
-
-        [(d11 * d02 - d01 * d12) * inv_denom,
-         (d00 * d12 - d01 * d02) * inv_denom]
-    }
-
-    #[inline]
     pub fn coordinate_f32x8x8(&self, p: Vector2<f32>, s: Vector2<f32>) -> [f32x8::f32x8x8; 2] {
         use f32x8::{f32x8x8, f32x8x8_vec2};
         let v2 = p - self.base;
@@ -352,9 +307,9 @@ impl Barycentric {
         use f32x4::{f32x4};
         let [u, v] = self.coordinate_f32x4(p, s);
         let uv = f32x4::broadcast(1.) - (u + v);
-        let mask = (u.to_bit_u32x4().and_self() |
-                    v.to_bit_u32x4().and_self() |
-                    uv.to_bit_u32x4().and_self());
+        let mask = u.to_bit_u32x4().and_self() |
+                   v.to_bit_u32x4().and_self() |
+                   uv.to_bit_u32x4().and_self();
 
         mask & 0x8000_0000 != 0
     }
@@ -441,7 +396,7 @@ impl Frame {
                     }
 
                     let mut depth = *self.get_depth_mut(x/8, y/8);
-                    for (xi, yi, w) in Group::new(off, &bary, clip3, &mut depth).iter() {
+                    for (xi, yi, w) in Group::new(off, &bary).mask_with_depth(clip3, &mut depth).iter() {
                         let x = x + xi as u32;
                         let y = y + yi as u32;
                         let frag = Interpolate::interpolate(&or, w);
