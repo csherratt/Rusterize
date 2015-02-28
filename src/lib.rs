@@ -399,10 +399,10 @@ impl Frame {
 
                     let mut depth = *self.get_depth_mut(x/8, y/8);
                     for (xi, yi, w) in Group::new(off, &bary).mask_with_depth(clip3, &mut depth).iter() {
-                        let x = x + xi as u32;
-                        let y = y + yi as u32;
+                        let xi = x + xi as u32;
+                        let yi = y + yi as u32;
                         let frag = Interpolate::interpolate(&or, w);
-                        self.frame.put_pixel(x, h-y-1, fragment.fragment(frag));
+                        self.frame.put_pixel(xi, h-yi-1, fragment.fragment(frag));
                     }
                     *self.get_depth_mut(x/8, y/8) = depth;
                 }

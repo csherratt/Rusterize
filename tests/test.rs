@@ -20,18 +20,6 @@ fn check(name: &str, frame: Frame) {
     let mut fout = File::create(&Path::new("test_data/results").join(format!("{}.frame.png", name))).unwrap();
     let _= image::ImageRgb8(frame.frame.clone()).save(&mut fout, image::PNG);
 
-    let (width, height) = frame.depth.dimensions();
-    let mut out = ImageBuffer::new(width, height);
-    for y in (0..height) {
-        for x in (0..width) {
-            let &Luma([p]) = frame.depth.get_pixel(x, y);
-            out.put_pixel(x, y, Luma([(p * 128. + 128.) as u8]));
-        }
-    }
-
-    let mut fout = File::create(&Path::new("test_data/results").join(format!("{}.depth.png", name))).unwrap();
-    let _= image::ImageLuma8(out).save(&mut fout, image::PNG);
-
     let expected = image::open(&Path::new("test_data/expected").join(format!("{}.frame.png", name))).unwrap();
     assert!(expected.raw_pixels() == frame.frame.as_slice());
 }
@@ -152,11 +140,11 @@ fn cube() {
             let color = triangle[i % 6];
             i += 1;
             Triangle::new(
-                (p.x, color),
-                (p.y, color),
-                (p.z, color)
+                (p.x, Flat(color)),
+                (p.y, Flat(color)),
+                (p.z, Flat(color))
             )
-        }).take(12);
+        });
 
     struct V;
 
@@ -170,6 +158,7 @@ fn cube() {
 
     frame.simd_raster(cube, V);
     check("cube", frame);
+    panic!()
 }
 
 #[test]
