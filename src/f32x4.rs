@@ -116,4 +116,10 @@ impl u32x4 {
         let u32x4(a, b, c, d) = self;
         a | b | c | d
     }
+
+    #[inline]
+    pub fn and_self(self) -> u32 {
+        let u32x4(a, b, c, d) = self;
+        a & b & c & d
+    }
 }

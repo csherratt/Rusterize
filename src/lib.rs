@@ -345,6 +345,19 @@ impl Barycentric {
         [(d02 * d11 - d12 * d01) * inv_denom,
          (d12 * d00 - d02 * d01) * inv_denom]
     }
+
+    /// a fast to check to tell if a tile is inside of the trinalge or not
+    #[inline]
+    pub fn tile_fast_check(&self, p: Vector2<f32>, s: Vector2<f32>) -> bool {
+        use f32x4::{f32x4};
+        let [u, v] = self.coordinate_f32x4(p, s);
+        let uv = f32x4::broadcast(1.) - (u + v);
+        let mask = (u.to_bit_u32x4().and_self() |
+                    v.to_bit_u32x4().and_self() |
+                    uv.to_bit_u32x4().and_self());
+
+        mask & 0x8000_0000 != 0
+    }
 }
 
 impl Frame {
@@ -422,6 +435,11 @@ impl Frame {
             for x in range_step(min_x, max_x, 8) {
                 for y in range_step(min_y, max_y, 8) {
                     let off = Vector2::new(x as f32, y as f32);
+
+                    if bary.tile_fast_check(off, Vector2::new(7., 7.)) {
+                        continue;
+                    }
+
                     let mut depth = *self.get_depth_mut(x/8, y/8);
                     for (xi, yi, w) in Group::new(off, &bary, clip3, &mut depth).iter() {
                         let x = x + xi as u32;
