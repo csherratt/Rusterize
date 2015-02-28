@@ -3,11 +3,27 @@ use std::mem;
 use cgmath::*;
 use super::vmath::Dot;
 
-#[derive(Copy, Debug)]
+#[derive(Clone, Copy, Debug)]
 #[simd]
 pub struct f32x8(pub f32, pub f32, pub f32, pub f32,
                  pub f32, pub f32, pub f32, pub f32);
 
+const mask_table: [[u32; 4]; 16] = [[ 0, 0, 0, 0],
+                                    [!0, 0, 0, 0],
+                                    [ 0,!0, 0, 0],
+                                    [!0,!0, 0, 0],
+                                    [ 0, 0,!0, 0],
+                                    [!0, 0,!0, 0],
+                                    [ 0,!0,!0, 0],
+                                    [!0,!0,!0, 0],
+                                    [ 0, 0, 0,!0],
+                                    [!0, 0, 0,!0],
+                                    [ 0,!0, 0,!0],
+                                    [!0,!0, 0,!0],
+                                    [ 0, 0,!0,!0],
+                                    [!0, 0,!0,!0],
+                                    [ 0,!0,!0,!0],
+                                    [!0,!0,!0,!0]];
 impl f32x8 {
     #[inline]
     pub fn broadcast(v: f32) -> f32x8 {
@@ -32,9 +48,22 @@ impl f32x8 {
     pub fn to_bit_u32x8(self) -> u32x8 {
         unsafe { mem::transmute(self) }
     }
+
+    #[inline]
+    pub fn replace(&mut self, other: f32x8, mask: u8) {
+        let mask = [mask_table[(mask & 0x0F) as usize],
+                    mask_table[((mask & 0xF0) >> 4) as usize]];
+        let mask: u32x8 = unsafe { mem::transmute(mask) };
+        let nmask: u32x8 = mask ^ u32x8::broadcast(!0);
+        let other: u32x8 = unsafe { mem::transmute(other) };
+        let s: u32x8 = unsafe { mem::transmute(*self) };
+        *self = unsafe {
+            mem::transmute((mask & other) | (nmask & s))
+        }
+    }
 }
 
-#[derive(Copy, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct f32x8x8(pub f32x8, pub f32x8, pub f32x8, pub f32x8,
                    pub f32x8, pub f32x8, pub f32x8, pub f32x8);
 
@@ -69,6 +98,18 @@ impl f32x8x8 {
                 f32x8::broadcast(7.))
     }
 
+    #[inline(never)]
+    pub fn replace(&mut self, other: f32x8x8, mask: u64) {
+        self.0.replace(other.0, (mask >> 0) as u8);
+        self.1.replace(other.1, (mask >> 8) as u8);
+        self.2.replace(other.2, (mask >> 16) as u8);
+        self.3.replace(other.3, (mask >> 24) as u8);
+        self.4.replace(other.4, (mask >> 32) as u8);
+        self.5.replace(other.5, (mask >> 40) as u8);
+        self.6.replace(other.6, (mask >> 48) as u8);
+        self.7.replace(other.7, (mask >> 56) as u8);
+    }
+
     #[inline]
     pub fn to_array(self) -> [f32; 64] {
         [(self.0).0, (self.0).1, (self.0).2, (self.0).3, (self.0).4, (self.0).5, (self.0).6, (self.0).7,
@@ -90,7 +131,7 @@ impl f32x8x8 {
     }
 }
 
-#[derive(Copy, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct f32x8x8_vec3(pub [f32x8x8; 3]);
 
 impl f32x8x8_vec3 {
@@ -188,7 +229,42 @@ impl Mul<f32x8> for f32x8x8 {
     }
 }
 
-#[derive(Copy, Debug)]
+impl Mul<f32> for f32x8x8 {
+    type Output = f32x8x8;
+
+    #[inline]
+    fn mul(self, rhs: f32) -> f32x8x8 {
+        self * f32x8::broadcast(rhs)
+    }
+}
+
+impl Neg for f32x8x8 {
+    type Output = f32x8x8;
+
+    #[inline]
+    fn neg(self) -> f32x8x8 {
+        f32x8x8(-self.0, -self.1,
+                -self.2, -self.3,
+                -self.4, -self.5,
+                -self.6, -self.7)
+    }
+}
+
+impl Neg for f32x8 {
+    type Output = f32x8;
+
+    #[inline]
+    fn neg(self) -> f32x8 {
+        f32x8(-self.0, -self.1,
+              -self.2, -self.3,
+              -self.4, -self.5,
+              -self.6, -self.7)
+    }
+}
+
+
+
+#[derive(Clone, Copy, Debug)]
 #[simd]
 pub struct u32x8(pub u32, pub u32, pub u32, pub u32, 
                  pub u32, pub u32, pub u32, pub u32);
@@ -205,7 +281,7 @@ impl u32x8 {
 }
 
 
-#[derive(Copy, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct f32x8x8_vec2(pub [f32x8x8; 2]);
 
 impl f32x8x8_vec2 {
@@ -222,16 +298,7 @@ impl f32x8x8_vec2 {
     }
 }
 
-impl Dot<f32x8x8_vec2> for f32x8x8_vec2 {
-    type Output = f32x8x8;
-
-    #[inline]
-    fn dot(self, rhs: f32x8x8_vec2) -> f32x8x8 {
-        self.0[0] * rhs.0[0] + self.0[1] * rhs.0[1]
-    }
-}
-
-#[derive(Copy, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct u32x8x8(pub u32x8, pub u32x8, pub u32x8, pub u32x8, 
                    pub u32x8, pub u32x8, pub u32x8, pub u32x8);
 
@@ -242,7 +309,7 @@ impl u32x8x8 {
         u32x8x8(v, v, v, v, v, v, v, v)
     }
 
-    #[inline]
+    #[inline(never)]
     pub fn bitmask(self) -> u64 {
         let mask = u32x8::broadcast(0x8000_0000);
         let scale = u32x8(0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80);
@@ -258,3 +325,31 @@ impl u32x8x8 {
         bmask_low as u64 | ((bmask_high as u64) << 32)
     }
 }
+
+impl Dot<f32x8x8_vec2> for f32x8x8_vec2 {
+    type Output = f32x8x8;
+
+    #[inline]
+    fn dot(self, rhs: f32x8x8_vec2) -> f32x8x8 {
+        self.0[0] * rhs.0[0] + self.0[1] * rhs.0[1]
+    }
+}
+
+impl Dot<f32x8x8_vec2> for Vector2<f32> {
+    type Output = f32x8x8;
+
+    #[inline]
+    fn dot(self, rhs: f32x8x8_vec2) -> f32x8x8 {
+        rhs.0[0] * self.x + rhs.0[1] * self.y
+    }
+}
+
+impl Dot<Vector2<f32>> for Vector2<f32> {
+    type Output = f32;
+
+    #[inline]
+    fn dot(self, rhs: Vector2<f32>) -> f32 {
+        rhs.x * self.x + rhs.y * self.y
+    }
+}
+

@@ -24,8 +24,14 @@ impl Fragment<[f32; 4]> for SetValue {
     fn fragment(&self, _: [f32; 4]) -> Rgb<u8> { self.0 }
 }
 
+impl Fragment<([f32; 4], [f32; 3])> for SetValue {
+    type Color = Rgb<u8>;
+
+    fn fragment(&self, _: ([f32; 4], [f32; 3])) -> Rgb<u8> { self.0 }
+}
+
 #[bench]
-fn plane_simple(bench: &mut Bencher) {
+fn plane_simple_normal(bench: &mut Bencher) {
     let mut frame = Frame::new(SIZE, SIZE);
 
     bench.iter(|| {
@@ -39,13 +45,27 @@ fn plane_simple(bench: &mut Bencher) {
 }
 
 #[bench]
+fn plane_simple_simd(bench: &mut Bencher) {
+    let mut frame = Frame::new(SIZE, SIZE);
+
+    bench.iter(|| {
+        frame.clear();
+        let plane = generators::Plane::new();
+        frame.simd_raster(plane.triangulate()
+                         .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
+            SetValue(Rgb([255, 255, 255]))
+        );
+    });
+}
+
+#[bench]
 fn plane_subdivide(bench: &mut Bencher) {
     let mut frame = Frame::new(SIZE, SIZE);
 
     bench.iter(|| {
         frame.clear();
         let plane = generators::Plane::subdivide(128, 128);
-        frame.normal_raster(plane.triangulate()
+        frame.simd_raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
             SetValue(Rgb([255, 255, 255]))
         );
@@ -109,25 +129,6 @@ fn buffer_clear(bench: &mut Bencher) {
     bench.iter(|| { frame.clear(); });
 }
 
-#[bench]
-fn group_new(bench: &mut Bencher) {
-    use rusterize::Barycentric;
-    let tri = Triangle::new(Vector4::new(0., 0., 0., 0.),
-                            Vector4::new(1., 1., 0., 0.),
-                            Vector4::new(0., 1., 0., 0.));
-
-    let mut x = 0.;
-    let mut y = 0.;
-
-    let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
-
-    bench.iter(|| {
-        black_box(Group::new(Vector2::new(x, y), &bary, Vector3::new(0., 0., 0.)));
-        x += 1.;
-        y += 1.;
-    });
-}
-
 struct V {
     ka: Vector4<f32>,
     kd: Vector4<f32>,
@@ -163,7 +164,7 @@ fn monkey_normal(bench: &mut Bencher) {
                            .triangulate();
 
         frame.clear();
-        frame.normal_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
+        frame.normal_raster(vertex, SetValue(Rgb([255, 255, 255])));
     });
 }
 
@@ -186,7 +187,7 @@ fn monkey_simd(bench: &mut Bencher) {
                            .triangulate();
 
         frame.clear();
-        frame.simd_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
+        frame.simd_raster(vertex, SetValue(Rgb([255, 255, 255])));
     });
 }
 

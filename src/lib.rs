@@ -14,6 +14,7 @@ use cgmath::*;
 use genmesh::{Triangle, MapVertex};
 use group::Group;
 use vmath::Dot;
+use f32x8::f32x8x8;
 
 pub use pipeline::{Fragment, Vertex};
 pub use interpolate::{Flat, Interpolate};
@@ -40,7 +41,8 @@ fn dump(idx: usize, frame: &Frame) {
 #[derive(Clone)]
 pub struct Frame {
     pub frame: ImageBuffer<Rgb<u8>, Vec<u8>>,
-    pub depth: ImageBuffer<Luma<f32>, Vec<f32>>
+    pub depth: ImageBuffer<Luma<f32>, Vec<f32>>,
+    pub depth_fragment: Vec<f32x8x8>,
 }
 
 #[inline]
@@ -229,9 +231,9 @@ impl Barycentric {
         let v0 = t.y - t.x;
         let v1 = t.z - t.x;
 
-        let d00 = v0.dot(&v0);
-        let d01 = v0.dot(&v1);
-        let d11 = v1.dot(&v1);
+        let d00 = v0.dot(v0);
+        let d01 = v0.dot(v1);
+        let d11 = v1.dot(v1);
 
         let inv_denom = 1. / (d00 * d11 - d01 * d01);
 
@@ -247,11 +249,11 @@ impl Barycentric {
     pub fn coordinate(&self, p: Vector2<f32>) -> BarycentricCoordinate {
         let v2 = p - self.base;
 
-        let d00 = self.v0.dot(&self.v0);
-        let d01 = self.v0.dot(&self.v1);
-        let d02 = self.v0.dot(&v2);
-        let d11 = self.v1.dot(&self.v1);
-        let d12 = self.v1.dot(&v2);
+        let d00 = self.v0.dot(self.v0);
+        let d01 = self.v0.dot(self.v1);
+        let d02 = self.v0.dot(v2);
+        let d11 = self.v1.dot(self.v1);
+        let d12 = self.v1.dot(v2);
 
         let u = (d11 * d02 - d01 * d12) * self.inv_denom;
         let v = (d00 * d12 - d01 * d02) * self.inv_denom;
@@ -330,20 +332,18 @@ impl Barycentric {
         use f32x8::{f32x8x8, f32x8x8_vec2};
         let v2 = p - self.base;
 
-        let v0 = f32x8x8_vec2::broadcast(self.v0);
-        let v1 = f32x8x8_vec2::broadcast(self.v1);
         let v2 = f32x8x8_vec2::range(v2.x, v2.y, s.x, s.y);
 
-        let d00 = v0.dot(v0);
-        let d01 = v0.dot(v1);
-        let d02 = v0.dot(v2);
-        let d11 = v1.dot(v1);
-        let d12 = v1.dot(v2);
+        let d00 = self.v0.dot(self.v0);
+        let d01 = self.v0.dot(self.v1);
+        let d02 = self.v0.dot(v2);
+        let d11 = self.v1.dot(self.v1);
+        let d12 = self.v1.dot(v2);
 
         let inv_denom = f32x8x8::broadcast(self.inv_denom);
 
-        [(d11 * d02 - d01 * d12) * inv_denom,
-         (d00 * d12 - d01 * d02) * inv_denom]
+        [(d02 * d11 - d12 * d01) * inv_denom,
+         (d12 * d00 - d02 * d01) * inv_denom]
     }
 }
 
@@ -351,7 +351,8 @@ impl Frame {
     pub fn new(width: u32, height: u32) -> Frame {
         Frame {
             frame: ImageBuffer::new(width, height),
-            depth: ImageBuffer::from_pixel(width, height, Luma([1.]))
+            depth: ImageBuffer::from_pixel(width, height, Luma([1.])),
+            depth_fragment: (0..width / 8 * height / 8).map(|_| f32x8x8::broadcast(1.)).collect()
         }
     }
 
@@ -362,6 +363,14 @@ impl Frame {
         for depth in self.depth.as_mut_slice().iter_mut() {
             *depth = 1.;
         }
+        for depth in self.depth_fragment.iter_mut() {
+            *depth = f32x8x8::broadcast(1.);
+        }
+    }
+
+    fn get_depth_mut(&mut self, x: u32, y: u32) -> &mut f32x8x8 {
+        let w = self.frame.width() / 8;
+        return &mut self.depth_fragment[(w*y+x) as usize]
     }
 
     pub fn simd_raster<S, F, T, O>(&mut self, poly: S, fragment: F)
@@ -413,16 +422,14 @@ impl Frame {
             for x in range_step(min_x, max_x, 8) {
                 for y in range_step(min_y, max_y, 8) {
                     let off = Vector2::new(x as f32, y as f32);
-                    for (xi, yi, z, w) in Group::new(off, &bary, clip3).iter() {
+                    let mut depth = *self.get_depth_mut(x/8, y/8);
+                    for (xi, yi, w) in Group::new(off, &bary, clip3, &mut depth).iter() {
                         let x = x + xi as u32;
                         let y = y + yi as u32;
-                        let &Luma([dz]) = self.depth.get_pixel(x, h-y-1);
-                        if dz > z {
-                            let frag = Interpolate::interpolate(&or, w);
-                            self.frame.put_pixel(x, h-y-1, fragment.fragment(frag));
-                            self.depth.put_pixel(x, h-y-1, Luma([z]));
-                        }
+                        let frag = Interpolate::interpolate(&or, w);
+                        self.frame.put_pixel(x, h-y-1, fragment.fragment(frag));
                     }
+                    *self.get_depth_mut(x/8, y/8) = depth;
                 }
             }
         }
