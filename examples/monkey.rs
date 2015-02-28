@@ -20,7 +20,7 @@ use cgmath::*;
 use time::precise_time_s;
 use std::num::Float;
 
-const SIZE: u32 = 2048;
+const SIZE: u32 = 1024;
 
 fn main() {
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS)
@@ -64,12 +64,26 @@ fn main() {
     let mut texture_frame = gfx::Frame::new(SIZE as u16, SIZE as u16);
     texture_frame.colors.push(gfx::Plane::Texture(texture, 0, None));
 
+    let mut show_grid = 0;
+
     while !window.should_close() {
         glfw.poll_events();
         for (_, event) in glfw::flush_messages(&events) {
             match event {
                 glfw::WindowEvent::Key(glfw::Key::Escape, _, glfw::Action::Press, _) =>
                     window.set_should_close(true),
+                glfw::WindowEvent::Key(glfw::Key::Num1, _, glfw::Action::Press, _) =>
+                    show_grid = if show_grid == 8 { 0 } else { 8 },
+                glfw::WindowEvent::Key(glfw::Key::Num2, _, glfw::Action::Press, _) =>
+                    show_grid = if show_grid == 16 { 0 } else { 16 },
+                glfw::WindowEvent::Key(glfw::Key::Num3, _, glfw::Action::Press, _) =>
+                    show_grid = if show_grid == 32 { 0 } else { 32 },
+                glfw::WindowEvent::Key(glfw::Key::Num4, _, glfw::Action::Press, _) =>
+                    show_grid = if show_grid == 64 { 0 } else { 64 },
+                glfw::WindowEvent::Key(glfw::Key::Num5, _, glfw::Action::Press, _) =>
+                    show_grid = if show_grid == 128 { 0 } else { 128 },
+                glfw::WindowEvent::Key(glfw::Key::Num6, _, glfw::Action::Press, _) =>
+                    show_grid = if show_grid == 256 { 0 } else { 256 },
                 _ => {},
             }
         }
@@ -113,6 +127,9 @@ fn main() {
 
         frame.clear();
         frame.simd_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
+        if show_grid != 0 {
+            frame.draw_grid(show_grid, Rgb([128, 128, 128]));
+        }
         graphics.device.update_texture(&texture, &image_info, frame.frame.as_slice()).unwrap();
 
         graphics.renderer.blit(&texture_frame,

@@ -8,7 +8,7 @@ extern crate simd;
 
 use std::num::Float;
 use std::ops::Range;
-use std::iter::range_step;
+use std::iter::{range_step, range_step_inclusive};
 
 use image::{GenericImage, ImageBuffer, Rgb, Luma};
 use cgmath::*;
@@ -515,6 +515,34 @@ impl Frame {
                         self.depth.put_pixel(x, h-y-1, Luma([z]));
                     }
                 }
+            }
+        }
+    }
+
+    pub fn draw_grid(&mut self, spacing: u32, color: Rgb<u8>) {
+        // draw vertical lines
+        let h = self.frame.height();
+        let w = self.frame.width();
+
+        let mut put = |x, y| {
+            if x < w && y < h {
+                self.frame.put_pixel(x, y, color);
+            }
+
+        };
+
+        for x in range_step_inclusive(0, w, spacing) {
+            for y in range_step_inclusive(0, h, spacing) {
+                put(x, y-1);
+                put(x, y);
+                put(x, y+1);
+            }
+        }
+        for y in range_step_inclusive(0, h, spacing) {
+            for x in range_step_inclusive(0, w, spacing) {
+                put(x-1, y);
+                put(x, y);
+                put(x+1, y);
             }
         }
     }
