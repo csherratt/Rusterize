@@ -347,6 +347,7 @@ impl Frame {
               T: Clone + Interpolate<Out=O> + FetchPosition,
               F: Fragment<O, Color=Rgb<u8>> {
 
+        use std::cmp::{min, max};
         let h = self.frame.height();
         let w = self.frame.width();
         let (hf, wf) = (h as f32, w as f32);
@@ -373,23 +374,23 @@ impl Frame {
 
             let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
 
-            let max_x = clip.x.x.ceil().partial_max(clip.y.x.ceil().partial_max(clip.z.x.ceil())).partial_max(0.).partial_min(hf);
-            let min_x = clip.x.x.floor().partial_min(clip.y.x.floor().partial_min(clip.z.x.floor())).partial_max(0.).partial_min(hf);
-            let max_y = clip.x.y.ceil().partial_max(clip.y.y.ceil().partial_max(clip.z.y.ceil())).partial_max(0.).partial_min(wf);
-            let min_y = clip.x.y.floor().partial_min(clip.y.y.floor().partial_min(clip.z.y.floor())).partial_max(0.).partial_min(wf);
+            let max_x = clip.x.x.ceil().partial_max(clip.y.x.ceil().partial_max(clip.z.x.ceil()));
+            let min_x = clip.x.x.floor().partial_min(clip.y.x.floor().partial_min(clip.z.x.floor()));
+            let max_y = clip.x.y.ceil().partial_max(clip.y.y.ceil().partial_max(clip.z.y.ceil()));
+            let min_y = clip.x.y.floor().partial_min(clip.y.y.floor().partial_min(clip.z.y.floor()));
 
-            let min_x = min_x as u32 & 0xFFFFFFF8;
-            let min_y = min_y as u32 & 0xFFFFFFF8;
-            let max_x = max_x as u32;
-            let max_y = max_y as u32;
+            let min_x = (max(min_x as i32, 0) as u32) & 0xFFFFFFF8;
+            let min_y = (max(min_y as i32, 0) as u32) & 0xFFFFFFF8;
+            let max_x = min(max_x as u32, w-8);
+            let max_y = min(max_y as u32, w-8);
             let max_x = if max_x & 0x7 != 0 { max_x + (0x8 - (max_x & 0x7)) } else { max_x };
             let max_y = if max_y & 0x7 != 0 { max_y + (0x8 - (max_y & 0x7)) } else { max_y };
 
             let clip3 = Vector3::new(clip4.x.z, clip4.y.z, clip4.z.z);
             let bary = Barycentric::new(clip);
 
-            for x in range_step(min_x, max_x, 8) {
-                for y in range_step(min_y, max_y, 8) {
+            for x in range_step_inclusive(min_x, max_x, 8) {
+                for y in range_step_inclusive(min_y, max_y, 8) {
                     let off = Vector2::new(x as f32, y as f32);
 
                     if bary.tile_fast_check(off, Vector2::new(7., 7.)) {
@@ -519,8 +520,8 @@ impl Frame {
         }
     }
 
+    /// draw grid line over the frame buffer. This is mostly a debug feature
     pub fn draw_grid(&mut self, spacing: u32, color: Rgb<u8>) {
-        // draw vertical lines
         let h = self.frame.height();
         let w = self.frame.width();
 

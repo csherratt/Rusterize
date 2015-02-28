@@ -55,7 +55,7 @@ fn plane_simple() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 2.).mul_s(0.5)).into_fixed());
 
-    frame.normal_raster(cube, SetValue(Rgb([255, 255, 255])));
+    frame.simd_raster(cube, SetValue(Rgb([255, 255, 255])));
     check("plane", frame);
 }
 
@@ -66,7 +66,7 @@ fn plane_backface() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(-v.0, v.1, 0., 2.).mul_s(0.5)).into_fixed());
 
-    frame.normal_raster(cube, SetValue(Rgb([255, 255, 255])));
+    frame.simd_raster(cube, SetValue(Rgb([255, 255, 255])));
     check("plane_backface", frame);
 }
 
@@ -77,7 +77,7 @@ fn plane_fill() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
 
-    frame.normal_raster(cube,SetValue(Rgb([255, 255, 255])));
+    frame.simd_raster(cube,SetValue(Rgb([255, 255, 255])));
     check("plane_fill", frame);
 }
 
@@ -88,7 +88,7 @@ fn plane_overfill() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0 * 100., v.1 * 100., 0., 2.)).into_fixed());
 
-    frame.normal_raster(cube,SetValue(Rgb([255, 255, 255])));
+    frame.simd_raster(cube,SetValue(Rgb([255, 255, 255])));
     check("plane_overfill", frame);
 }
 
@@ -99,13 +99,13 @@ fn plane_back_front() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
 
-    frame.normal_raster(cube, SetValue(Rgb([255, 255, 255])));
+    frame.simd_raster(cube, SetValue(Rgb([255, 255, 255])));
 
     let cube = generators::Plane::new()
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 1., 1.)).into_fixed());
 
-    frame.normal_raster(cube, SetValue(Rgb([128, 128, 128])));
+    frame.simd_raster(cube, SetValue(Rgb([128, 128, 128])));
 
     check("plane_back_front", frame);
 }
@@ -117,12 +117,12 @@ fn plane_front_back() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 1., 1.)).into_fixed());
 
-    frame.normal_raster(cube, SetValue(Rgb([255, 255, 255])));
+    frame.simd_raster(cube, SetValue(Rgb([255, 255, 255])));
     let cube = generators::Plane::new()
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
 
-    frame.normal_raster(cube, SetValue(Rgb([128, 128, 128])));
+    frame.simd_raster(cube, SetValue(Rgb([128, 128, 128])));
     check("plane_front_back", frame);
 }
 
@@ -156,7 +156,7 @@ fn cube() {
                 (p.y, color),
                 (p.z, color)
             )
-        });
+        }).take(12);
 
     struct V;
 
@@ -168,8 +168,7 @@ fn cube() {
         }
     }
 
-
-    frame.normal_raster(cube, V);
+    frame.simd_raster(cube, V);
     check("cube", frame);
 }
 
@@ -194,7 +193,8 @@ fn triangle() {
     }
 
     let mut frame = Frame::new(SIZE, SIZE);
-    frame.normal_raster(triangle.iter().map(|x| *x), V);
+    frame.simd_raster(triangle.iter().map(|x| *x), V);
+    //frame.draw_grid(16, Rgb([255, 255, 255]));
     check("triangle", frame);
 }
 
@@ -219,7 +219,7 @@ fn triangle_flat() {
     }
 
     let mut frame = Frame::new(SIZE, SIZE);
-    frame.normal_raster(triangle.iter().map(|x| *x), V);
+    frame.simd_raster(triangle.iter().map(|x| *x), V);
     check("triangle_flat", frame);
 }
 
@@ -256,7 +256,7 @@ fn monkey() {
     }
 
     let mut frame = Frame::new(SIZE, SIZE);
-    frame.normal_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
+    frame.simd_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
     check("monkey", frame);
 }
 
@@ -267,7 +267,7 @@ fn buffer_clear() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
 
-    frame.normal_raster(cube, SetValue(Rgb([255, 255, 255])));
+    frame.simd_raster(cube, SetValue(Rgb([255, 255, 255])));
     frame.clear();
     check("buffer_clear", frame);
 }
