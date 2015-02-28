@@ -219,7 +219,7 @@ fn barycentric_f32x8x8(bench: &mut Bencher) {
 #[bench]
 fn group(bench: &mut Bencher) {
     use rusterize::Barycentric;
-    use rusterize::group::Group;
+    use rusterize::tile::Tile;
 
     let tri = Triangle::new(Vector4::new(0., 0., 0., 0.),
                             Vector4::new(1., 1., 0., 0.),
@@ -231,7 +231,7 @@ fn group(bench: &mut Bencher) {
     let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
 
     bench.iter(|| {
-        black_box(Group::new(Vector2::new(x, y), &bary));
+        black_box(Tile::new(Vector2::new(x, y), &bary));
         x += 1.;
         y += 1.;
     });
@@ -240,7 +240,7 @@ fn group(bench: &mut Bencher) {
 #[bench]
 fn mask_with_depth(bench: &mut Bencher) {
     use rusterize::Barycentric;
-    use rusterize::group::Group;
+    use rusterize::tile::Tile;
     use rusterize::f32x8::f32x8x8;
 
     let tri = Triangle::new(Vector4::new(0., 0., 0., 0.),
@@ -251,7 +251,7 @@ fn mask_with_depth(bench: &mut Bencher) {
     let mut y = 0.;
 
     let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
-    let group = Group::new(Vector2::new(x, y), &bary);
+    let group = Tile::new(Vector2::new(x, y), &bary);
 
     bench.iter(|| {
         let mut depth = f32x8x8::broadcast(x);
@@ -264,7 +264,7 @@ fn mask_with_depth(bench: &mut Bencher) {
 #[bench]
 fn full_mask(bench: &mut Bencher) {
     use rusterize::Barycentric;
-    use rusterize::group::Group;
+    use rusterize::tile::Tile;
     use rusterize::f32x8::f32x8x8;
 
     let tri = Triangle::new(Vector4::new(0., 0., 0., 0.),
@@ -278,10 +278,31 @@ fn full_mask(bench: &mut Bencher) {
     let mut depth = f32x8x8::broadcast(x);
 
     bench.iter(|| {
-        black_box(Group::new(Vector2::new(x, y), &bary)
+        black_box(Tile::new(Vector2::new(x, y), &bary)
                         .mask_with_depth(Vector3::new(x, y, x), &mut depth));
         x += 1.;
         y += 1.;
     });
 }
 
+#[bench]
+fn tile_fast_check(bench: &mut Bencher) {
+    use rusterize::Barycentric;
+    use rusterize::tile::Tile;
+    use rusterize::f32x8::f32x8x8;
+
+    let tri = Triangle::new(Vector4::new(0., 0., 0., 0.),
+                            Vector4::new(1., 1., 0., 0.),
+                            Vector4::new(0., 1., 0., 0.));
+
+    let mut x = 0.;
+    let mut y = 0.;
+
+    let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
+
+    bench.iter(|| {
+        black_box(bary.tile_fast_check(Vector2::new(x, y), Vector2::new(7., 7.)));
+        x += 1.;
+        y += 1.;
+    });
+}

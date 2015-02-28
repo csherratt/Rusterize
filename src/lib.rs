@@ -13,7 +13,7 @@ use std::iter::{range_step, range_step_inclusive};
 use image::{GenericImage, ImageBuffer, Rgb, Luma};
 use cgmath::*;
 use genmesh::{Triangle, MapVertex};
-use group::Group;
+use tile::Tile;
 use vmath::Dot;
 use f32x8::f32x8x8;
 
@@ -25,7 +25,7 @@ mod pipeline;
 mod f32x4;
 pub mod f32x8;
 mod vmath;
-pub mod group;
+pub mod tile;
 
 
 #[cfg(dump)]
@@ -398,7 +398,7 @@ impl Frame {
                     }
 
                     let mut depth = *self.get_depth_mut(x/8, y/8);
-                    for (xi, yi, w) in Group::new(off, &bary).mask_with_depth(clip3, &mut depth).iter() {
+                    for (xi, yi, w) in Tile::new(off, &bary).mask_with_depth(clip3, &mut depth).iter() {
                         let xi = x + xi as u32;
                         let yi = y + yi as u32;
                         let frag = Interpolate::interpolate(&or, w);

@@ -158,7 +158,6 @@ fn cube() {
 
     frame.simd_raster(cube, V);
     check("cube", frame);
-    panic!()
 }
 
 #[test]
