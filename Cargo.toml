@@ -26,3 +26,6 @@ path = "examples/monkey.rs"
 
 [dependencies.gfx]
 git = "https://github.com/gfx-rs/gfx-rs.git"
+
+[dependencies.gfx_device_gl]
+git = "https://github.com/gfx-rs/gfx_device_gl.git"

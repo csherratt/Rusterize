@@ -1,6 +1,7 @@
 #![feature(core, path)]
 
 extern crate gfx;
+extern crate gfx_device_gl;
 extern crate glfw;
 extern crate rusterize;
 extern crate genmesh;
@@ -37,7 +38,7 @@ fn main() {
     glfw.set_error_callback(glfw::FAIL_ON_ERRORS);
     window.set_key_polling(true);
 
-    let device = gfx::GlDevice::new(|s| window.get_proc_address(s));
+    let device = gfx_device_gl::GlDevice::new(|s| window.get_proc_address(s));
     let mut graphics = gfx::Graphics::new(device);
 
     let texture_info = gfx::tex::TextureInfo {
