@@ -19,6 +19,8 @@ use image::Rgb;
 use cgmath::*;
 use time::precise_time_s;
 use std::num::Float;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 const SIZE: u32 = 1024;
 
@@ -65,6 +67,9 @@ fn main() {
     texture_frame.colors.push(gfx::Plane::Texture(texture, 0, None));
 
     let mut show_grid = 0;
+    let mut raster_order = false;
+    let mut paused = false;
+    let mut time = precise_time_s() as f32;
 
     while !window.should_close() {
         glfw.poll_events();
@@ -84,11 +89,17 @@ fn main() {
                     show_grid = if show_grid == 128 { 0 } else { 128 },
                 glfw::WindowEvent::Key(glfw::Key::Num6, _, glfw::Action::Press, _) =>
                     show_grid = if show_grid == 256 { 0 } else { 256 },
+                glfw::WindowEvent::Key(glfw::Key::Space, _, glfw::Action::Press, _) =>
+                    paused ^= true,
+                glfw::WindowEvent::Key(glfw::Key::R, _, glfw::Action::Press, _) =>
+                    raster_order ^= true,
                 _ => {},
             }
         }
 
-        let time = precise_time_s() as f32;
+        if !paused {
+            time = precise_time_s() as f32;
+        }
         let cam_pos = {
             // Slowly circle the center
             let x = (0.25*time).sin();
@@ -117,7 +128,7 @@ fn main() {
         impl Fragment<([f32; 4], [f32; 3])> for V {
             type Color = Rgb<u8>;
 
-            #[inline(never)]
+            #[inline]
             fn fragment(&self, (_, n) : ([f32; 4], [f32; 3])) -> Rgb<u8> {
                 let normal = Vector4::new(n[0], n[1], n[2], 0.);
                 let v = self.kd.mul_s(self.light_normal.dot(&normal).partial_max(0.)) + self.ka;
@@ -125,8 +136,26 @@ fn main() {
             }
         }
 
+        struct RO {
+            v: Arc<AtomicUsize>
+        }
+
+        impl Fragment<([f32; 4], [f32; 3])> for RO {
+            type Color = Rgb<u8>;
+
+            #[inline]
+            fn fragment(&self, (_, n) : ([f32; 4], [f32; 3])) -> Rgb<u8> {
+                let x = self.v.fetch_add(1, Ordering::SeqCst);
+                Rgb([(x >> 5) as u8, (x >> 9) as u8, (x >> 12) as u8])
+            }
+        }
+
         frame.clear();
-        frame.simd_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
+        if !raster_order {
+            frame.simd_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
+        } else {
+            frame.simd_raster(vertex, RO{v: Arc::new(AtomicUsize::new(0))});
+        }
         if show_grid != 0 {
             frame.draw_grid(show_grid, Rgb([128, 128, 128]));
         }
