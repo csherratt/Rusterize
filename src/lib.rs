@@ -389,8 +389,8 @@ impl Frame {
             let clip3 = Vector3::new(clip4.x.z, clip4.y.z, clip4.z.z);
             let bary = Barycentric::new(clip);
 
-            for x in range_step_inclusive(min_x, max_x, 8) {
-                for y in range_step_inclusive(min_y, max_y, 8) {
+            for y in range_step_inclusive(min_y, max_y, 8) {
+                for x in range_step_inclusive(min_x, max_x, 8) {
                     let off = Vector2::new(x as f32, y as f32);
 
                     if bary.tile_fast_check(off, Vector2::new(7., 7.)) {
