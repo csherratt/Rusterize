@@ -59,7 +59,30 @@ pub struct u32x4(pub u32, pub u32, pub u32, pub u32);
 impl u32x4 {
     #[inline]
     pub fn and_self(self) -> u32 {
-        let u32x4(a, b, c, d) = self;
-        a & b & c & d
+        let (a, b) = self.split();
+        (a & b).and_self()
+    }
+
+    #[inline]
+    pub fn split(self) -> (u32x2, u32x2) {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+
+#[derive(Copy, Debug)]
+#[simd]
+pub struct u32x2(pub u32, pub u32);
+
+impl u32x2 {
+    #[inline]
+    pub fn and_self(self) -> u32 {
+        let (a, b) = self.split();
+        a & b
+    }
+
+    #[inline]
+    pub fn split(self) -> (u32, u32) {
+        unsafe { mem::transmute(self) }
     }
 }
