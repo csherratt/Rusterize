@@ -13,7 +13,7 @@ use std::iter::{range_step, range_step_inclusive};
 use image::{GenericImage, ImageBuffer, Rgb, Luma};
 use cgmath::*;
 use genmesh::{Triangle, MapVertex};
-use tile::Tile;
+use tile::TileMask;
 use vmath::Dot;
 use f32x8::f32x8x8;
 
@@ -398,9 +398,9 @@ impl Frame {
                     }
 
                     let mut depth = *self.get_depth_mut(x/8, y/8);
-                    for (xi, yi, w) in Tile::new(off, &bary).mask_with_depth(clip3, &mut depth).iter() {
-                        let xi = x + xi as u32;
-                        let yi = y + yi as u32;
+                    for (i, w) in TileMask::new(off, &bary).mask_with_depth(&clip3, &mut depth).iter() {
+                        let xi = x + i.x();
+                        let yi = y + i.y();
                         let frag = Interpolate::interpolate(&or, w);
                         self.frame.put_pixel(xi, h-yi-1, fragment.fragment(frag));
                     }
