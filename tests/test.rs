@@ -11,14 +11,14 @@ use cgmath::*;
 use genmesh::generators;
 use genmesh::{Triangulate, MapToVertices};
 use std::old_io::File;
-use image::{Rgb, Luma, ImageBuffer};
+use image::{Rgba, Luma, ImageBuffer};
 
 const SIZE: u32 = 64;
 
 fn check(name: &str, frame: Frame) {
     // Save the image output just incase the test fails
     let mut fout = File::create(&Path::new("test_data/results").join(format!("{}.frame.png", name))).unwrap();
-    let _= image::ImageRgb8(frame.frame.clone()).save(&mut fout, image::PNG);
+    let _= image::ImageRgba8(frame.frame.clone()).save(&mut fout, image::PNG);
 
     let expected = image::open(&Path::new("test_data/expected").join(format!("{}.frame.png", name))).unwrap();
     assert!(expected.raw_pixels() == frame.frame.as_slice());
@@ -28,12 +28,13 @@ fn proj() -> Matrix4<f32> {
     ortho(-1., 1., -1., 1., -2., 2.)
 }
 
-struct SetValue(Rgb<u8>);
+#[derive(Clone)]
+struct SetValue(Rgba<u8>);
 
 impl Fragment<[f32; 4]> for SetValue {
-    type Color = Rgb<u8>;
+    type Color = Rgba<u8>;
 
-    fn fragment(&self, v: [f32; 4]) -> Rgb<u8> { self.0 }
+    fn fragment(&self, v: [f32; 4]) -> Rgba<u8> { self.0 }
 }
 
 #[test]
@@ -43,7 +44,7 @@ fn plane_simple() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 2.).mul_s(0.5)).into_fixed());
 
-    frame.simd_raster(cube, SetValue(Rgb([255, 255, 255])));
+    frame.simd_raster(cube, SetValue(Rgba([255, 255, 255, 255])));
     check("plane", frame);
 }
 
@@ -54,7 +55,7 @@ fn plane_backface() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(-v.0, v.1, 0., 2.).mul_s(0.5)).into_fixed());
 
-    frame.simd_raster(cube, SetValue(Rgb([255, 255, 255])));
+    frame.simd_raster(cube, SetValue(Rgba([255, 255, 255, 255])));
     check("plane_backface", frame);
 }
 
@@ -65,7 +66,7 @@ fn plane_fill() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
 
-    frame.simd_raster(cube,SetValue(Rgb([255, 255, 255])));
+    frame.simd_raster(cube,SetValue(Rgba([255, 255, 255, 255])));
     check("plane_fill", frame);
 }
 
@@ -76,7 +77,7 @@ fn plane_overfill() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0 * 100., v.1 * 100., 0., 2.)).into_fixed());
 
-    frame.simd_raster(cube,SetValue(Rgb([255, 255, 255])));
+    frame.simd_raster(cube,SetValue(Rgba([255, 255, 255, 255])));
     check("plane_overfill", frame);
 }
 
@@ -87,13 +88,13 @@ fn plane_back_front() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
 
-    frame.simd_raster(cube, SetValue(Rgb([255, 255, 255])));
+    frame.simd_raster(cube, SetValue(Rgba([255, 255, 255, 255])));
 
     let cube = generators::Plane::new()
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 1., 1.)).into_fixed());
 
-    frame.simd_raster(cube, SetValue(Rgb([128, 128, 128])));
+    frame.simd_raster(cube, SetValue(Rgba([128, 128, 128, 255])));
 
     check("plane_back_front", frame);
 }
@@ -105,12 +106,12 @@ fn plane_front_back() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 1., 1.)).into_fixed());
 
-    frame.simd_raster(cube, SetValue(Rgb([255, 255, 255])));
+    frame.simd_raster(cube, SetValue(Rgba([255, 255, 255, 255])));
     let cube = generators::Plane::new()
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
 
-    frame.simd_raster(cube, SetValue(Rgb([128, 128, 128])));
+    frame.simd_raster(cube, SetValue(Rgba([128, 128, 128, 255])));
     check("plane_front_back", frame);
 }
 
@@ -146,13 +147,14 @@ fn cube() {
             )
         });
 
+    #[derive(Clone)]
     struct V;
 
     impl Fragment<([f32; 4], [f32; 3])> for V {
-        type Color = Rgb<u8>;
+        type Color = Rgba<u8>;
 
-        fn fragment(&self, (_, color) : ([f32; 4], [f32; 3])) -> Rgb<u8> {
-            Rgb([color[0] as u8, color[1] as u8, color[2] as u8])
+        fn fragment(&self, (_, color) : ([f32; 4], [f32; 3])) -> Rgba<u8> {
+            Rgba([color[0] as u8, color[1] as u8, color[2] as u8, 255])
         }
     }
 
@@ -170,19 +172,20 @@ fn triangle() {
         ([  0.0,  0.5, 0., 1., ], [0.0, 0.0, 1.0]),
     )];
 
+    #[derive(Clone)]
     struct V;
 
     impl Fragment<([f32; 4], [f32; 3])> for V {
-        type Color = Rgb<u8>;
+        type Color = Rgba<u8>;
 
-        fn fragment(&self, (_, color) : ([f32; 4], [f32; 3])) -> Rgb<u8> {
-            Rgb([(color[0] * 255.) as u8, (color[1] * 255.) as u8, (color[2] * 255.) as u8])
+        fn fragment(&self, (_, color) : ([f32; 4], [f32; 3])) -> Rgba<u8> {
+            Rgba([(color[0] * 255.) as u8, (color[1] * 255.) as u8, (color[2] * 255.) as u8, 255])
         }
     }
 
     let mut frame = Frame::new(SIZE, SIZE);
     frame.simd_raster(triangle.iter().map(|x| *x), V);
-    //frame.draw_grid(16, Rgb([255, 255, 255]));
+    //frame.draw_grid(16, Rgba([255, 255, 255, 255]));
     check("triangle", frame);
 }
 
@@ -196,13 +199,14 @@ fn triangle_flat() {
         ([  0.0,  0.5, 0., 1., ], Flat([0.0, 0.0, 1.0])),
     )];
 
+    #[derive(Clone)]
     struct V;
 
     impl Fragment<([f32; 4], [f32; 3])> for V {
-        type Color = Rgb<u8>;
+        type Color = Rgba<u8>;
 
-        fn fragment(&self, (_, color) : ([f32; 4], [f32; 3])) -> Rgb<u8> {
-            Rgb([(color[0] * 255.) as u8, (color[1] * 255.) as u8, (color[2] * 255.) as u8])
+        fn fragment(&self, (_, color) : ([f32; 4], [f32; 3])) -> Rgba<u8> {
+            Rgba([(color[0] * 255.) as u8, (color[1] * 255.) as u8, (color[2] * 255.) as u8, 255])
         }
     }
 
@@ -227,6 +231,7 @@ fn monkey() {
                        .vertex(|(p, n)| (proj.mul_v(&Vector4::new(p[0], p[1], p[2], 1.)).into_fixed(), n))
                        .triangulate();
 
+    #[derive(Clone)]
     struct V {
         ka: Vector4<f32>,
         kd: Vector4<f32>,
@@ -234,12 +239,12 @@ fn monkey() {
     }
 
     impl Fragment<([f32; 4], [f32; 3])> for V {
-        type Color = Rgb<u8>;
+        type Color = Rgba<u8>;
 
-        fn fragment(&self, (_, n) : ([f32; 4], [f32; 3])) -> Rgb<u8> {
+        fn fragment(&self, (_, n) : ([f32; 4], [f32; 3])) -> Rgba<u8> {
             let normal = Vector4::new(n[0], n[1], n[2], 0.);
             let v = self.kd.mul_s(self.light_normal.dot(&normal).partial_max(0.)) + self.ka;
-            Rgb([v.x as u8, v.y as u8, v.z as u8])
+            Rgba([v.x as u8, v.y as u8, v.z as u8, 255])
         }
     }
 
@@ -255,7 +260,7 @@ fn buffer_clear() {
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
 
-    frame.simd_raster(cube, SetValue(Rgb([255, 255, 255])));
+    frame.simd_raster(cube, SetValue(Rgba([255, 255, 255, 255])));
     frame.clear();
     check("buffer_clear", frame);
 }

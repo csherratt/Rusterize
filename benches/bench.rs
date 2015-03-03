@@ -11,22 +11,22 @@ use rusterize::{Frame, Fragment};
 use cgmath::*;
 use genmesh::*;
 use test::{Bencher, black_box};
-use image::Rgb;
+use image::Rgba;
 
 const SIZE: u32 = 1024;
 
-struct SetValue(Rgb<u8>);
+struct SetValue(Rgba<u8>);
 
 impl Fragment<[f32; 4]> for SetValue {
-    type Color = Rgb<u8>;
+    type Color = Rgba<u8>;
 
-    fn fragment(&self, _: [f32; 4]) -> Rgb<u8> { self.0 }
+    fn fragment(&self, _: [f32; 4]) -> Rgba<u8> { self.0 }
 }
 
 impl Fragment<([f32; 4], [f32; 3])> for SetValue {
-    type Color = Rgb<u8>;
+    type Color = Rgba<u8>;
 
-    fn fragment(&self, _: ([f32; 4], [f32; 3])) -> Rgb<u8> { self.0 }
+    fn fragment(&self, _: ([f32; 4], [f32; 3])) -> Rgba<u8> { self.0 }
 }
 
 #[bench]
@@ -38,7 +38,7 @@ fn plane_simple_normal(bench: &mut Bencher) {
         let plane = generators::Plane::new();
         frame.normal_raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
-            SetValue(Rgb([255, 255, 255]))
+            SetValue(Rgba([255, 255, 255, 255]))
         );
     });
 }
@@ -52,7 +52,7 @@ fn plane_simple_simd(bench: &mut Bencher) {
         let plane = generators::Plane::new();
         frame.simd_raster(plane.triangulate()
                          .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
-            SetValue(Rgb([255, 255, 255]))
+            SetValue(Rgba([255, 255, 255, 255]))
         );
     });
 }
@@ -66,7 +66,7 @@ fn plane_subdivide(bench: &mut Bencher) {
         let plane = generators::Plane::subdivide(128, 128);
         frame.simd_raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
-            SetValue(Rgb([255, 255, 255]))
+            SetValue(Rgba([255, 255, 255, 255]))
         );
     });
 }
@@ -80,7 +80,7 @@ fn plane_backface(bench: &mut Bencher) {
         let plane = generators::Plane::new();
         frame.simd_raster(plane.triangulate()
                           .vertex(|v| Vector4::new(-v.0, v.1, 0., 1.).into_fixed()),
-            SetValue(Rgb([255, 255, 255]))
+            SetValue(Rgba([255, 255, 255, 255]))
         );
     });
 }
@@ -94,11 +94,11 @@ fn plane_front_back(bench: &mut Bencher) {
         let plane = generators::Plane::new();
         frame.simd_raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 1., 1.).into_fixed()),
-            SetValue(Rgb([255, 255, 255]))
+            SetValue(Rgba([255, 255, 255, 255]))
         );
         frame.simd_raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
-            SetValue(Rgb([128, 128, 128]))
+            SetValue(Rgba([128, 128, 128, 255]))
         );
     });
 }
@@ -112,11 +112,11 @@ fn plane_back_front(bench: &mut Bencher) {
         let plane = generators::Plane::new();
         frame.simd_raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
-            SetValue(Rgb([255, 255, 255]))
+            SetValue(Rgba([255, 255, 255, 255]))
         );
         frame.simd_raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 1., 1.).into_fixed()),
-            SetValue(Rgb([128, 128, 128]))
+            SetValue(Rgba([128, 128, 128, 255]))
         );
     });
 }
@@ -143,7 +143,7 @@ fn monkey_normal(bench: &mut Bencher) {
                            .triangulate();
 
         frame.clear();
-        frame.normal_raster(vertex, SetValue(Rgb([255, 255, 255])));
+        frame.normal_raster(vertex, SetValue(Rgba([255, 255, 255, 255])));
     });
 }
 
@@ -162,7 +162,7 @@ fn monkey_simd(bench: &mut Bencher) {
                            .triangulate();
 
         frame.clear();
-        frame.simd_raster(vertex, SetValue(Rgb([255, 255, 255])));
+        frame.simd_raster(vertex, SetValue(Rgba([255, 255, 255, 255])));
     });
 }
 

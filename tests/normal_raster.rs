@@ -15,23 +15,23 @@ use rusterize::{
     Fragment
 };
 use cgmath::*;
-use image::Rgb;
+use image::Rgba;
 use std::old_io::File;
 
 fn save(name: String, mut expected: Frame, result: Frame) {
     let mut valid = true;
     for (exp, rst) in expected.frame.pixels_mut().zip(result.frame.pixels()) {
-        if *exp != *rst && *exp == Rgb([255, 255, 255]) {
+        if *exp != *rst && *exp == Rgba([255, 255, 255, 255]) {
             valid = false;
-            *exp = Rgb([255, 0, 0])
-        } else if *exp != *rst && *rst == Rgb([255, 255, 255]) {
+            *exp = Rgba([255, 0, 0, 255])
+        } else if *exp != *rst && *rst == Rgba([255, 255, 255, 255]) {
             valid = false;
-            *exp = Rgb([0, 255, 0])
+            *exp = Rgba([0, 255, 0, 255])
         }
     }
 
     let mut fout = File::create(&Path::new("test_data/results").join(format!("{}.png", name))).unwrap();
-    let _= image::ImageRgb8(expected.frame.clone()).save(&mut fout, image::PNG);
+    let _= image::ImageRgba8(expected.frame.clone()).save(&mut fout, image::PNG);
     assert!(valid);
 }
 

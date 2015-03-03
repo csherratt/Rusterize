@@ -15,7 +15,7 @@ use glfw::Context;
 use genmesh::{Triangulate, MapToVertices};
 use genmesh::generators::Cube;
 use rusterize::{Frame, Fragment};
-use image::Rgb;
+use image::Rgba;
 use cgmath::*;
 use time::precise_time_s;
 use std::num::Float;
@@ -119,6 +119,7 @@ fn main() {
                            .vertex(|(p, n)| (mat.mul_v(&Vector4::new(p[0], p[1], p[2], 1.)).into_fixed(), n))
                            .triangulate();
 
+        #[derive(Clone)]
         struct V {
             ka: Vector4<f32>,
             kd: Vector4<f32>,
@@ -126,27 +127,28 @@ fn main() {
         }
 
         impl Fragment<([f32; 4], [f32; 3])> for V {
-            type Color = Rgb<u8>;
+            type Color = Rgba<u8>;
 
             #[inline]
-            fn fragment(&self, (_, n) : ([f32; 4], [f32; 3])) -> Rgb<u8> {
+            fn fragment(&self, (_, n) : ([f32; 4], [f32; 3])) -> Rgba<u8> {
                 let normal = Vector4::new(n[0], n[1], n[2], 0.);
                 let v = self.kd.mul_s(self.light_normal.dot(&normal).partial_max(0.)) + self.ka;
-                Rgb([v.x as u8, v.y as u8, v.z as u8])
+                Rgba([v.x as u8, v.y as u8, v.z as u8, 255])
             }
         }
 
+        #[derive(Clone)]
         struct RO {
             v: Arc<AtomicUsize>
         }
 
         impl Fragment<([f32; 4], [f32; 3])> for RO {
-            type Color = Rgb<u8>;
+            type Color = Rgba<u8>;
 
             #[inline]
-            fn fragment(&self, (_, n) : ([f32; 4], [f32; 3])) -> Rgb<u8> {
+            fn fragment(&self, (_, n) : ([f32; 4], [f32; 3])) -> Rgba<u8> {
                 let x = self.v.fetch_add(1, Ordering::SeqCst);
-                Rgb([(x >> 5) as u8, (x >> 9) as u8, (x >> 12) as u8])
+                Rgba([(x >> 5) as u8, (x >> 9) as u8, (x >> 12) as u8, 255])
             }
         }
 
@@ -157,7 +159,7 @@ fn main() {
             frame.simd_raster(vertex, RO{v: Arc::new(AtomicUsize::new(0))});
         }
         if show_grid != 0 {
-            frame.draw_grid(show_grid, Rgb([128, 128, 128]));
+            frame.draw_grid(show_grid, Rgba([128, 128, 128, 255]));
         }
         graphics.device.update_texture(&texture, &image_info, frame.frame.as_slice()).unwrap();
 

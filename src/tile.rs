@@ -3,7 +3,7 @@ use std::mem;
 use std::num::Int;
 
 use cgmath::*;
-use image::{Rgb, ImageBuffer};
+use image::{Rgba, ImageBuffer};
 use genmesh::Triangle;
 
 use {Barycentric, Interpolate, Fragment};
@@ -16,7 +16,7 @@ pub struct TileMask {
 }
 
 impl TileMask {
-    #[inline]
+    #[inline(always)]
     /// Calculate the u/v coordinates for the fragment
     pub fn new(pos: Vector2<f32>, bary: &Barycentric) -> TileMask {
         let [u, v] =  bary.coordinate_f32x8x8(pos, Vector2::new(1., 1.));
@@ -87,12 +87,75 @@ impl Iterator for TileMaskIter {
     }
 }
 
+#[derive(Copy)]
 pub struct Tile {
     depth: f32x8x8,
-    color: [Rgb<u8>; 64],
+    color: [Rgba<u8>; 64],
+}
+
+impl Clone for Tile {
+    fn clone(&self) -> Tile {
+        Tile {
+            depth: self.depth,
+            color: self.color
+        }
+    }
 }
 
 impl Tile {
+    pub fn new() -> Tile {
+         Tile {
+            depth: f32x8x8::broadcast(1.),
+            color: [Rgba([0, 0, 0, 0]); 64]
+        }       
+    }
+
+    pub fn read(x: u32, y: u32, v: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> Tile {
+        let mut color = [Rgba([0, 0, 0, 0]); 64];
+        for i in (0..64).map(|x| TileIndex(x)) {
+            color[i.0 as usize] = *v.get_pixel(x+i.x(), y+i.y()); 
+        }
+        Tile {
+            depth: f32x8x8::broadcast(1.),
+            color: color
+        }
+    }
+
+    #[inline]
+    pub fn write(&self, x: u32, y: u32, v: &mut ImageBuffer<Rgba<u8>, Vec<u8>>) {
+        let mut color = [Rgba([0, 0, 0, 0]); 64];
+        for i in (0..64).map(|x| TileIndex(x)) {
+            v.put_pixel(x+i.x(), y+i.y(), self.color[i.0 as usize]);
+        }
+    }
+
+    #[inline]
+    pub fn raster<F, T, O>(&mut self, x: u32, y: u32, z: &Vector3<f32>, bary: &Barycentric, t: &Triangle<T>, fragment: &F) where
+              T: Interpolate<Out=O>,
+              F: Fragment<O, Color=Rgba<u8>> {
+
+        let off = Vector2::new(x as f32, y as f32);
+        let mask = TileMask::new(off, &bary).mask_with_depth(z, &mut self.depth);
+        for (i, w) in mask.iter() {
+            let frag = Interpolate::interpolate(t, w);
+            unsafe { *self.color.get_unchecked_mut(i.0 as usize) = fragment.fragment(frag); }
+        }
+    }
+
+    #[inline]
+    pub fn clear(&mut self) {
+        self.depth = f32x8x8::broadcast(1.);
+        self.color = [Rgba([0, 0, 0, 0]); 64];
+    }
+}
+
+pub struct TileGroup {
+    tiles: [Tile; 64],
+    x: u32,
+    y: u32
+}
+/*
+impl TileGroup {
     pub fn read(x: u32, y: u32, v: &ImageBuffer<Rgb<u8>, Vec<u8>>) -> Tile {
         let mut color = [Rgb([0, 0, 0]); 64];
         for i in (0..64).map(|x| TileIndex(x)) {
@@ -122,10 +185,4 @@ impl Tile {
             self.color[i.0 as usize] = fragment.fragment(frag);
         }
     }
-}
-
-pub struct TileGroup {
-    tiles: [Tile; 64],
-    x: u32,
-    y: u32
-}
+}*/

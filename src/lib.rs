@@ -10,10 +10,10 @@ use std::num::Float;
 use std::ops::Range;
 use std::iter::{range_step, range_step_inclusive};
 
-use image::{GenericImage, ImageBuffer, Rgb, Luma};
+use image::{GenericImage, ImageBuffer, Rgba, Luma};
 use cgmath::*;
 use genmesh::{Triangle, MapVertex};
-use tile::TileMask;
+use tile::{TileMask, Tile};
 use vmath::Dot;
 use f32x8::f32x8x8;
 
@@ -33,14 +33,7 @@ fn dump(idx: usize, frame: &Frame) {
     use std::old_io::File;
     // Save the image output just incase the test fails
     let mut fout = File::create(&Path::new("dump").join(format!("{:05}.png", idx))).unwrap();
-    let _= image::ImageRgb8(frame.frame.clone()).save(&mut fout, image::PNG);
-}
-
-#[derive(Clone)]
-pub struct Frame {
-    pub frame: ImageBuffer<Rgb<u8>, Vec<u8>>,
-    pub depth: ImageBuffer<Luma<f32>, Vec<f32>>,
-    pub depth_fragment: Vec<f32x8x8>,
+    let _= image::ImageRgba8(frame.frame.clone()).save(&mut fout, image::PNG);
 }
 
 #[inline]
@@ -316,12 +309,20 @@ impl Barycentric {
     }
 }
 
+#[derive(Clone)]
+pub struct Frame {
+    pub frame: ImageBuffer<Rgba<u8>, Vec<u8>>,
+    pub depth: ImageBuffer<Luma<f32>, Vec<f32>>,
+    pub tile: Vec<Vec<Tile>>,
+}
+
 impl Frame {
     pub fn new(width: u32, height: u32) -> Frame {
+        let buffer = ImageBuffer::new(width, height);
         Frame {
-            frame: ImageBuffer::new(width, height),
+            frame: buffer,
             depth: ImageBuffer::from_pixel(width, height, Luma([1.])),
-            depth_fragment: (0..width / 8 * height / 8).map(|_| f32x8x8::broadcast(1.)).collect()
+            tile: (0..(height / 8)).map(|_| (0..(width / 8)).map(|_| Tile::new()).collect()).collect()
         }
     }
 
@@ -332,20 +333,29 @@ impl Frame {
         for depth in self.depth.as_mut_slice().iter_mut() {
             *depth = 1.;
         }
-        for depth in self.depth_fragment.iter_mut() {
-            *depth = f32x8x8::broadcast(1.);
+        for row in self.tile.iter_mut() {
+            for tile in row.iter_mut() {
+                tile.clear();
+            }
         }
     }
 
-    fn get_depth_mut(&mut self, x: u32, y: u32) -> &mut f32x8x8 {
-        let w = self.frame.width() / 8;
-        return &mut self.depth_fragment[(w*y+x) as usize]
+    fn get_tile_mut(&mut self, x: usize, y: usize) -> &mut Tile {
+        return &mut self.tile[x][y]
+    }
+
+    fn sync(&mut self) {
+        for (x, row) in self.tile.iter().enumerate() {
+            for (y, tile) in row.iter().enumerate() {
+                tile.write((x*8) as u32, (y*8) as u32, &mut self.frame);
+            }
+        }
     }
 
     pub fn simd_raster<S, F, T, O>(&mut self, poly: S, fragment: F)
         where S: Iterator<Item=Triangle<T>>,
               T: Clone + Interpolate<Out=O> + FetchPosition,
-              F: Fragment<O, Color=Rgb<u8>> {
+              F: Fragment<O, Color=Rgba<u8>> {
 
         use std::cmp::{min, max};
         let h = self.frame.height();
@@ -392,28 +402,23 @@ impl Frame {
             for y in range_step_inclusive(min_y, max_y, 8) {
                 for x in range_step_inclusive(min_x, max_x, 8) {
                     let off = Vector2::new(x as f32, y as f32);
-
                     if bary.tile_fast_check(off, Vector2::new(7., 7.)) {
                         continue;
                     }
 
-                    let mut depth = *self.get_depth_mut(x/8, y/8);
-                    for (i, w) in TileMask::new(off, &bary).mask_with_depth(&clip3, &mut depth).iter() {
-                        let xi = x + i.x();
-                        let yi = y + i.y();
-                        let frag = Interpolate::interpolate(&or, w);
-                        self.frame.put_pixel(xi, h-yi-1, fragment.fragment(frag));
-                    }
-                    *self.get_depth_mut(x/8, y/8) = depth;
+                    let tile = self.get_tile_mut((x/8) as usize, (y/8) as usize);
+                    tile.raster(x, y, &clip3, &bary, &or, &fragment);
                 }
             }
         }
+
+        self.sync();
     }
 
     pub fn normal_raster<S, F, T, O>(&mut self, poly: S, fragment: F)
         where S: Iterator<Item=Triangle<T>>,
               T: Clone + Interpolate<Out=O> + FetchPosition,
-              F: Fragment<O, Color=Rgb<u8>> {
+              F: Fragment<O, Color=Rgba<u8>> {
 
         let h = self.frame.height();
         let w = self.frame.width();
@@ -470,7 +475,7 @@ impl Frame {
     pub fn debug_raster<S, F, T, O>(&mut self, poly: S, fragment: F)
         where S: Iterator<Item=Triangle<T>>,
               T: Clone + Interpolate<Out=O> + FetchPosition,
-              F: Fragment<O, Color=Rgb<u8>> {
+              F: Fragment<O, Color=Rgba<u8>> {
 
         let h = self.frame.height();
         let w = self.frame.width();
@@ -521,7 +526,7 @@ impl Frame {
     }
 
     /// draw grid line over the frame buffer. This is mostly a debug feature
-    pub fn draw_grid(&mut self, spacing: u32, color: Rgb<u8>) {
+    pub fn draw_grid(&mut self, spacing: u32, color: Rgba<u8>) {
         let h = self.frame.height();
         let w = self.frame.width();
 
