@@ -370,15 +370,15 @@ impl Frame {
 
             let clip4 = t.map_vertex(|v| {
                 Vector4::new(
-                    hh * (v.x / v.w) + hh,
-                    wh * (v.y / v.w) + wh,
+                    wh * (v.x / v.w) + wh,
+                    -hh * (v.y / v.w) + hh,
                     v.z / v.w,
                     v.w / v.w
                 )
             });
 
             // cull any backface triangles
-            if is_backface(clip4.map_vertex(|v| Vector3::new(v.x, v.y, v.z))) {
+            if !is_backface(clip4.map_vertex(|v| Vector3::new(v.x, v.y, v.z))) {
                 continue;
             }
 
