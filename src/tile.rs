@@ -34,12 +34,11 @@ impl TileMask {
     }
 
     #[inline(always)]
-    pub fn mask_with_depth(mut self, z: &Vector3<f32>, d: &mut f32x8x8) -> TileMask {
+    pub fn mask_with_depth(&mut self, z: &Vector3<f32>, d: &mut f32x8x8) {
         let z = f32x8x8_vec3::broadcast(Vector3::new(z.x, z.y, z.z));
         let depth = self.weights.dot(z);
         self.mask &= (depth - *d).to_bit_u32x8x8().bitmask();
         d.replace(depth, self.mask);
-        self
     }
 
     #[inline]
@@ -129,13 +128,19 @@ impl Tile {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn raster<F, T, O>(&mut self, x: u32, y: u32, z: &Vector3<f32>, bary: &Barycentric, t: &Triangle<T>, fragment: &F) where
               T: Interpolate<Out=O>,
               F: Fragment<O, Color=Rgba<u8>> {
 
         let off = Vector2::new(x as f32, y as f32);
-        let mask = TileMask::new(off, &bary).mask_with_depth(z, &mut self.depth);
+        if bary.tile_fast_check(off, Vector2::new(7., 7.)) {
+            return;
+        }
+
+        let off = Vector2::new(x as f32, y as f32);
+        let mut mask = TileMask::new(off, &bary);
+        mask.mask_with_depth(z, &mut self.depth);
         for (i, w) in mask.iter() {
             let frag = Interpolate::interpolate(t, w);
             unsafe { *self.color.get_unchecked_mut(i.0 as usize) = fragment.fragment(frag); }

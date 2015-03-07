@@ -9,18 +9,19 @@ extern crate image;
 extern crate obj;
 extern crate cgmath;
 extern crate time;
+extern crate rand;
 
 use gfx::Device;
 use glfw::Context;
-use genmesh::{Triangulate, MapToVertices};
-use genmesh::generators::Cube;
-use rusterize::{Frame, Fragment};
+use genmesh::*;
+use rusterize::{Frame, Fragment, Barycentric};
 use image::Rgba;
 use cgmath::*;
 use time::precise_time_s;
 use std::num::Float;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use rand::distributions::{IndependentSample, Range};
 
 const SIZE: u32 = 1024;
 
@@ -50,14 +51,6 @@ fn main() {
     };
     let image_info = texture_info.to_image_info();
 
-    let obj = obj::load(&Path::new("test_assets/monkey.obj")).unwrap();
-    let monkey = obj.object_iter().next().unwrap().group_iter().next().unwrap();
-
-    let light_normal = Vector4::new(10., 10., 10., 0.).normalize();
-    let kd = Vector4::new(64., 128., 64., 1.);
-    let ka = Vector4::new(16., 16., 16., 1.);
-
-    let proj = cgmath::perspective(cgmath::deg(60.0f32), 1.0, 0.01, 100.0);
     let mut frame = Frame::new(SIZE, SIZE);
 
     let texture = graphics.device.create_texture(texture_info).unwrap();
@@ -69,7 +62,15 @@ fn main() {
     let mut show_grid = 0;
     let mut raster_order = false;
     let mut paused = false;
-    let mut time = precise_time_s() as f32;
+
+    let mut tri = Triangle::new(
+        Vector2::new(-0.5, -0.5),
+        Vector2::new( 0.5, -0.5),
+        Vector2::new( 0.0,  0.5),
+    ).map_vertex(|v| {
+        Vector2::new(v.x * 512. + 512., v.y * 512. + 512.)
+    });
+    let mut bary = Barycentric::new(tri);
 
     while !window.should_close() {
         glfw.poll_events();
@@ -89,75 +90,80 @@ fn main() {
                     show_grid = if show_grid == 128 { 0 } else { 128 },
                 glfw::WindowEvent::Key(glfw::Key::Num6, _, glfw::Action::Press, _) =>
                     show_grid = if show_grid == 256 { 0 } else { 256 },
-                glfw::WindowEvent::Key(glfw::Key::Space, _, glfw::Action::Press, _) =>
-                    paused ^= true,
+                glfw::WindowEvent::Key(glfw::Key::Space, _, glfw::Action::Press, _) => {
+                    let between = Range::new(-1f32, 1.);
+                    let mut rng = rand::thread_rng();
+                    tri = Triangle::new(
+                        Vector2::new(between.ind_sample(&mut rng), between.ind_sample(&mut rng)),
+                        Vector2::new(between.ind_sample(&mut rng), between.ind_sample(&mut rng)),
+                        Vector2::new(between.ind_sample(&mut rng), between.ind_sample(&mut rng)),
+                    ).map_vertex(|v| {
+                        Vector2::new(v.x * 512. + 512., v.y * 512. + 512.)
+                    });
+                    bary = Barycentric::new(tri);
+                }
                 glfw::WindowEvent::Key(glfw::Key::R, _, glfw::Action::Press, _) =>
                     raster_order ^= true,
                 _ => {},
             }
         }
 
-        if !paused {
-            time = precise_time_s() as f32;
-        }
-        let cam_pos = {
-            // Slowly circle the center
-            let x = (0.25*time).sin();
-            let y = (0.25*time).cos();
-            Point3::new(x * 2.0, y * 2.0, 2.0)
-        };
-        let view: AffineMatrix3<f32> = Transform::look_at(
-            &cam_pos,
-            &Point3::new(0.0, 0.0, 0.0),
-            &Vector3::unit_y(),
-        );
+        let proj = ortho(-1., 1., -1., 1., -2., 2.);
 
-        let mat = proj.mul_m(&view.mat);
-
-        let vertex = monkey.indices().iter().map(|x| *x)
-                           .vertex(|(p, _, n)| { (obj.position()[p], obj.normal()[n.unwrap()]) })
-                           .vertex(|(p, n)| (mat.mul_v(&Vector4::new(p[0], p[1], p[2], 1.)).into_fixed(), n))
-                           .triangulate();
+        let plane = generators::Plane::new()
+            .triangulate()
+            .vertex(|v| proj.mul_v(&Vector4::new(v.0, v.1, 1., 1.)).into_fixed())
+            .vertex(|v| {
+                (v, [512. * v[0] / v[3] + 512., 512. * v[1] / v[3] + 512.])
+            });
 
         #[derive(Clone)]
         struct V {
-            ka: Vector4<f32>,
-            kd: Vector4<f32>,
-            light_normal: Vector4<f32>
+            bary: Barycentric
         }
 
-        impl Fragment<([f32; 4], [f32; 3])> for V {
+        impl Fragment<([f32; 4], [f32; 2])> for V {
             type Color = Rgba<u8>;
 
-            #[inline]
-            fn fragment(&self, (_, n) : ([f32; 4], [f32; 3])) -> Rgba<u8> {
-                let normal = Vector4::new(n[0], n[1], n[2], 0.);
-                let v = self.kd.mul_s(self.light_normal.dot(&normal).partial_max(0.)) + self.ka;
-                Rgba([v.x as u8, v.y as u8, v.z as u8, 255])
+            fn fragment(&self, (pos, screen) : ([f32; 4], [f32; 2])) -> Rgba<u8> {
+                let coord = self.bary.coordinate(Vector2::new(screen[0], screen[1]));
+
+                let x0 = screen[0] as u32 & !0x7;
+                let y0 = screen[1] as u32 & !0x7;
+                let x1 = screen[0] as u32 & !0xF;
+                let y1 = screen[1] as u32 & !0xF;
+                let x2 = screen[0] as u32 & !0x1F;
+                let y2 = screen[1] as u32 & !0x1F;
+                let x3 = screen[0] as u32 & !0x3F;
+                let y3 = screen[1] as u32 & !0x3F;
+
+                let b = if coord.inside() { 255 } else { 0 };
+
+                if !self.bary.tile_covered(Vector2::new(x3 as f32, y3 as f32), Vector2::new(63., 63.)) {
+                    Rgba([0, 196, b, 255])
+                } else if !self.bary.tile_covered(Vector2::new(x2 as f32, y2 as f32), Vector2::new(31., 31.)) {
+                    Rgba([0, 128, b, 255])
+                } else if !self.bary.tile_covered(Vector2::new(x1 as f32, y1 as f32), Vector2::new(15., 15.)) {
+                    Rgba([0, 64, b, 255])
+                } else if !self.bary.tile_covered(Vector2::new(x0 as f32, y0 as f32), Vector2::new(7., 7.)) {
+                    Rgba([0, 32, b, 255])
+                } else if !self.bary.tile_fast_check(Vector2::new(x0 as f32, y0 as f32), Vector2::new(7., 7.)) {
+                    Rgba([196, 0, b, 255])
+                } else if !self.bary.tile_fast_check(Vector2::new(x1 as f32, y1 as f32), Vector2::new(15., 15.)) {
+                    Rgba([128, 0, b, 255])
+                } else if !self.bary.tile_fast_check(Vector2::new(x2 as f32, y2 as f32), Vector2::new(31., 31.)) {
+                    Rgba([64, 0, b, 255])
+                } else if !self.bary.tile_fast_check(Vector2::new(x3 as f32, y3 as f32), Vector2::new(63., 63.)) {
+                    Rgba([32, 0, b, 255])
+                } else {
+                    Rgba([0, 0, 0, 255])
+                }
             }
         }
 
-        #[derive(Clone)]
-        struct RO {
-            v: Arc<AtomicUsize>
-        }
+        let mut frame = Frame::new(SIZE, SIZE);
+        frame.simd_raster(plane, V{bary: bary});
 
-        impl Fragment<([f32; 4], [f32; 3])> for RO {
-            type Color = Rgba<u8>;
-
-            #[inline]
-            fn fragment(&self, (_, n) : ([f32; 4], [f32; 3])) -> Rgba<u8> {
-                let x = self.v.fetch_add(1, Ordering::SeqCst);
-                Rgba([(x >> 5) as u8, (x >> 9) as u8, (x >> 12) as u8, 255])
-            }
-        }
-
-        frame.clear();
-        if !raster_order {
-            frame.simd_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
-        } else {
-            frame.simd_raster(vertex, RO{v: Arc::new(AtomicUsize::new(0))});
-        }
         if show_grid != 0 {
             frame.draw_grid(show_grid, Rgba([128, 128, 128, 255]));
         }

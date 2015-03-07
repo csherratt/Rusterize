@@ -64,6 +64,12 @@ impl u32x4 {
     }
 
     #[inline]
+    pub fn or_self(self) -> u32 {
+        let (a, b) = self.split();
+        (a | b).or_self()
+    }
+
+    #[inline]
     pub fn split(self) -> (u32x2, u32x2) {
         unsafe { mem::transmute(self) }
     }
@@ -79,6 +85,12 @@ impl u32x2 {
     pub fn and_self(self) -> u32 {
         let (a, b) = self.split();
         a & b
+    }
+
+    #[inline]
+    pub fn or_self(self) -> u32 {
+        let (a, b) = self.split();
+        a | b
     }
 
     #[inline]

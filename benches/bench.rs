@@ -251,7 +251,7 @@ fn mask_with_depth(bench: &mut Bencher) {
     let mut y = 0.;
 
     let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
-    let group = TileMask::new(Vector2::new(x, y), &bary);
+    let mut group = TileMask::new(Vector2::new(x, y), &bary);
 
     bench.iter(|| {
         let mut depth = f32x8x8::broadcast(x);

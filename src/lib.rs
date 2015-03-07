@@ -37,7 +37,7 @@ fn dump(idx: usize, frame: &Frame) {
 }
 
 #[inline]
-fn is_backface(v: Triangle<Vector3<f32>>)-> bool {
+pub fn is_backface(v: Triangle<Vector3<f32>>)-> bool {
     let e0 = v.z - v.x;
     let e1 = v.z - v.y;
     let normal = e1.cross(&e0);
@@ -190,7 +190,7 @@ impl Iterator for FlatTriangleIter {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Barycentric {
     pub v0: Vector2<f32>,
     pub v1: Vector2<f32>,
@@ -295,7 +295,7 @@ impl Barycentric {
          (d12 * d00 - d02 * d01) * inv_denom]
     }
 
-    /// a fast to check to tell if a tile is inside of the trinalge or not
+    /// a fast to check to tell if a tile is inside of the triangle or not
     #[inline]
     pub fn tile_fast_check(&self, p: Vector2<f32>, s: Vector2<f32>) -> bool {
         use f32x4::{f32x4};
@@ -304,6 +304,18 @@ impl Barycentric {
         let mask = u.to_bit_u32x4().and_self() |
                    v.to_bit_u32x4().and_self() |
                    uv.to_bit_u32x4().and_self();
+
+        mask & 0x8000_0000 != 0
+    }
+
+    #[inline]
+    pub fn tile_covered(&self, p: Vector2<f32>, s: Vector2<f32>) -> bool {
+        use f32x4::{f32x4};
+        let [u, v] = self.coordinate_f32x4(p, s);
+        let uv = f32x4::broadcast(1.) - (u + v);
+        let mask = u.to_bit_u32x4().or_self() |
+                   v.to_bit_u32x4().or_self() |
+                   uv.to_bit_u32x4().or_self();
 
         mask & 0x8000_0000 != 0
     }
@@ -401,11 +413,6 @@ impl Frame {
 
             for y in range_step_inclusive(min_y, max_y, 8) {
                 for x in range_step_inclusive(min_x, max_x, 8) {
-                    let off = Vector2::new(x as f32, y as f32);
-                    if bary.tile_fast_check(off, Vector2::new(7., 7.)) {
-                        continue;
-                    }
-
                     let tile = self.get_tile_mut((x/8) as usize, (y/8) as usize);
                     tile.raster(x, y, &clip3, &bary, &or, &fragment);
                 }

@@ -185,7 +185,6 @@ fn triangle() {
 
     let mut frame = Frame::new(SIZE, SIZE);
     frame.simd_raster(triangle.iter().map(|x| *x), V);
-    //frame.draw_grid(16, Rgba([255, 255, 255, 255]));
     check("triangle", frame);
 }
 
