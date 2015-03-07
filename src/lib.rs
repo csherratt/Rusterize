@@ -13,7 +13,7 @@ use std::iter::{range_step, range_step_inclusive};
 use image::{GenericImage, ImageBuffer, Rgba, Luma};
 use cgmath::*;
 use genmesh::{Triangle, MapVertex};
-use tile::{TileMask, Tile};
+use tile::{TileMask, Tile, TileGroup};
 use vmath::Dot;
 use f32x8::f32x8x8;
 
@@ -325,7 +325,7 @@ impl Barycentric {
 pub struct Frame {
     pub frame: ImageBuffer<Rgba<u8>, Vec<u8>>,
     pub depth: ImageBuffer<Luma<f32>, Vec<f32>>,
-    pub tile: Vec<Vec<Tile>>,
+    pub tile: Vec<Vec<TileGroup>>,
 }
 
 impl Frame {
@@ -334,7 +334,7 @@ impl Frame {
         Frame {
             frame: buffer,
             depth: ImageBuffer::from_pixel(width, height, Luma([1.])),
-            tile: (0..(height / 8)).map(|_| (0..(width / 8)).map(|_| Tile::new()).collect()).collect()
+            tile: (0..(height / 64)).map(|_| (0..(width / 64)).map(|_| TileGroup::new()).collect()).collect()
         }
     }
 
@@ -352,14 +352,14 @@ impl Frame {
         }
     }
 
-    fn get_tile_mut(&mut self, x: usize, y: usize) -> &mut Tile {
+    fn get_tile_mut(&mut self, x: usize, y: usize) -> &mut TileGroup {
         return &mut self.tile[x][y]
     }
 
     fn sync(&mut self) {
         for (x, row) in self.tile.iter().enumerate() {
             for (y, tile) in row.iter().enumerate() {
-                tile.write((x*8) as u32, (y*8) as u32, &mut self.frame);
+                tile.write((x*64) as u32, (y*64) as u32, &mut self.frame);
             }
         }
     }
@@ -401,19 +401,19 @@ impl Frame {
             let max_y = clip.x.y.ceil().partial_max(clip.y.y.ceil().partial_max(clip.z.y.ceil()));
             let min_y = clip.x.y.floor().partial_min(clip.y.y.floor().partial_min(clip.z.y.floor()));
 
-            let min_x = (max(min_x as i32, 0) as u32) & 0xFFFFFFF8;
-            let min_y = (max(min_y as i32, 0) as u32) & 0xFFFFFFF8;
-            let max_x = min(max_x as u32, w-8);
-            let max_y = min(max_y as u32, w-8);
-            let max_x = if max_x & 0x7 != 0 { max_x + (0x8 - (max_x & 0x7)) } else { max_x };
-            let max_y = if max_y & 0x7 != 0 { max_y + (0x8 - (max_y & 0x7)) } else { max_y };
+            let min_x = (max(min_x as i32, 0) as u32) & (0xFFFFFFFF & !0x3F);
+            let min_y = (max(min_y as i32, 0) as u32) & (0xFFFFFFFF & !0x3F);
+            let max_x = min(max_x as u32, w);
+            let max_y = min(max_y as u32, h);
+            let max_x = if max_x & (64-1) != 0 { max_x + (64 - (max_x & (64-1))) } else { max_x };
+            let max_y = if max_y & (64-1) != 0 { max_y + (64 - (max_y & (64-1))) } else { max_y };
 
             let clip3 = Vector3::new(clip4.x.z, clip4.y.z, clip4.z.z);
             let bary = Barycentric::new(clip);
 
-            for y in range_step_inclusive(min_y, max_y, 8) {
-                for x in range_step_inclusive(min_x, max_x, 8) {
-                    let tile = self.get_tile_mut((x/8) as usize, (y/8) as usize);
+            for y in range_step(min_y, max_y, 64) {
+                for x in range_step(min_x, max_x, 64) {
+                    let tile = self.get_tile_mut((x/64) as usize, (y/64) as usize);
                     tile.raster(x, y, &clip3, &bary, &or, &fragment);
                 }
             }

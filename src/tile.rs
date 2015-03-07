@@ -56,6 +56,8 @@ pub struct TileIndex(pub u32);
 impl TileIndex {
     #[inline] pub fn x(self) -> u32 { (self.0 as u32)  & 0x7 }
     #[inline] pub fn y(self) -> u32 { (self.0 as u32)  >> 3 }
+    #[inline] pub fn x8(self) -> u32 { self.x() * 8 }
+    #[inline] pub fn y8(self) -> u32 { self.y() * 8 }
 }
 
 pub struct TileMaskIter {
@@ -154,40 +156,70 @@ impl Tile {
     }
 }
 
+#[derive(Copy)]
 pub struct TileGroup {
     tiles: [Tile; 64],
     x: u32,
     y: u32
 }
-/*
+
+impl Clone for TileGroup {
+    fn clone(&self) -> TileGroup {
+        TileGroup {
+            tiles: self.tiles,
+            x: self.x,
+            y: self.y
+        }
+    }
+}
+
 impl TileGroup {
-    pub fn read(x: u32, y: u32, v: &ImageBuffer<Rgb<u8>, Vec<u8>>) -> Tile {
-        let mut color = [Rgb([0, 0, 0]); 64];
-        for i in (0..64).map(|x| TileIndex(x)) {
-            color[i.0 as usize] = *v.get_pixel(x+i.x(), y+i.y()); 
-        }
-        Tile {
-            depth: f32x8x8::broadcast(1.),
-            color: color
+    pub fn new() -> TileGroup {
+        TileGroup {
+            tiles: [Tile::new(); 64],
+            x: 0,
+            y: 0
         }
     }
 
-    pub fn write(&self, x: u32, y: u32, v: &mut ImageBuffer<Rgb<u8>, Vec<u8>>) {
-        let mut color = [Rgb([0, 0, 0]); 64];
-        for i in (0..64).map(|x| TileIndex(x)) {
-            v.put_pixel(x+i.x(), y+i.y(), self.color[i.0 as usize]);
+    pub fn read(x: u32, y: u32, v: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> TileGroup {
+        let mut tiles = [Tile::new(); 64];
+        for (i, tile) in tiles.iter_mut().enumerate() {
+            let i = TileIndex(i as u32);
+            *tile = Tile::read(x + i.x8(), y + i.y8(), v);
+        }
+        TileGroup {
+            tiles: tiles,
+            x: x,
+            y: y
         }
     }
 
-    pub fn raster<F, T, O>(&mut self, x: u32, y: u32, z: &Vector3<f32>, bary: &Barycentric, t: &Triangle<T>, fragment: F) where
+    pub fn write(&self, x: u32, y: u32, v: &mut ImageBuffer<Rgba<u8>, Vec<u8>>) {
+        for (i, tile) in self.tiles.iter().enumerate() {
+            let i = TileIndex(i as u32);
+            tile.write(x + i.x8(), y + i.y8(), v);
+        }
+    }
+
+    pub fn raster<F, T, O>(&mut self, x: u32, y: u32, z: &Vector3<f32>, bary: &Barycentric, t: &Triangle<T>, fragment: &F) where
               T: Interpolate<Out=O>,
-              F: Fragment<O, Color=Rgb<u8>> {
+              F: Fragment<O, Color=Rgba<u8>> {
 
         let off = Vector2::new(x as f32, y as f32);
-        let mask = TileMask::new(off, &bary).mask_with_depth(z, &mut self.depth);
-        for (i, w) in mask.iter() {
-            let frag = Interpolate::interpolate(t, w);
-            self.color[i.0 as usize] = fragment.fragment(frag);
+        if bary.tile_fast_check(off, Vector2::new(63., 63.)) {
+            return;
+        }
+
+        for (i, tile) in self.tiles.iter_mut().enumerate() {
+            let i = TileIndex(i as u32);
+            tile.raster(x + i.x8(), y + i.y8(), z, bary, t, fragment);
         }
     }
-}*/
+
+    pub fn clear(&mut self) {
+        for tile in self.tiles.iter_mut() {
+            tile.clear()
+        }
+    }
+}
