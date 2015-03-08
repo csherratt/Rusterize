@@ -8,6 +8,7 @@ extern crate simd;
 
 use std::num::Float;
 use std::ops::Range;
+use std::sync::Arc;
 use std::iter::{range_step, range_step_inclusive};
 
 use image::{GenericImage, ImageBuffer, Rgba, Luma};
@@ -175,6 +176,39 @@ impl Barycentric {
     }
 }
 
+struct TriangleGroup<T>(Vec<(Triangle<Vector4<f32>>, Triangle<T>)>);
+
+impl<T> TriangleGroup<T> {
+    fn from_iter<S, O>(poly: &mut S, wh: f32, hh: f32) -> TriangleGroup<T>
+        where S: Iterator<Item=Triangle<T>>,
+              T: Clone + Interpolate<Out=O> + FetchPosition {
+
+        TriangleGroup(
+            poly.map(|or| {
+                let t = or.clone().map_vertex(|v| {
+                    let v = v.position();
+                    Vector4::new(v[0], v[1], v[2], v[3])
+                });
+
+                let clip4 = t.map_vertex(|v| {
+                    Vector4::new(
+                        wh * (v.x / v.w) + wh,
+                        -hh * (v.y / v.w) + hh,
+                        v.z / v.w,
+                        v.w / v.w
+                    )
+                });
+
+                (clip4, or)
+            }).filter(|&(ref clip4, _)| {
+                is_backface(clip4.map_vertex(|v| Vector3::new(v.x, v.y, v.z)))
+            }).take(64).collect()
+        )
+
+    }
+}
+
+
 #[derive(Clone)]
 pub struct Frame {
     pub width: u32,
@@ -219,7 +253,7 @@ impl Frame {
         buffer
     }
 
-    pub fn raster<S, F, T, O>(&mut self, poly: S, fragment: F)
+    pub fn raster<S, F, T, O>(&mut self, mut poly: S, fragment: F)
         where S: Iterator<Item=Triangle<T>>,
               T: Clone + Interpolate<Out=O> + FetchPosition,
               F: Fragment<O, Color=Rgba<u8>> {
@@ -229,47 +263,36 @@ impl Frame {
         let w = self.width;
         let (hf, wf) = (h as f32, w as f32);
         let (hh, wh) = (hf/2., wf/2.);
-        for or in poly {
-            let t = or.clone().map_vertex(|v| {
-                let v = v.position();
-                Vector4::new(v[0], v[1], v[2], v[3])
-            });
 
-            let clip4 = t.map_vertex(|v| {
-                Vector4::new(
-                    wh * (v.x / v.w) + wh,
-                    -hh * (v.y / v.w) + hh,
-                    v.z / v.w,
-                    v.w / v.w
-                )
-            });
-
-            // cull any backface triangles
-            if !is_backface(clip4.map_vertex(|v| Vector3::new(v.x, v.y, v.z))) {
-                continue;
+        loop {
+            let group = Arc::new(TriangleGroup::from_iter(&mut poly, hh, wh));
+            if group.0.len() == 0 {
+                break;
             }
 
-            let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
+            for &(ref clip4, ref or) in group.0.iter() {
+                let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
 
-            let max_x = clip.x.x.ceil().partial_max(clip.y.x.ceil().partial_max(clip.z.x.ceil()));
-            let min_x = clip.x.x.floor().partial_min(clip.y.x.floor().partial_min(clip.z.x.floor()));
-            let max_y = clip.x.y.ceil().partial_max(clip.y.y.ceil().partial_max(clip.z.y.ceil()));
-            let min_y = clip.x.y.floor().partial_min(clip.y.y.floor().partial_min(clip.z.y.floor()));
+                let max_x = clip.x.x.ceil().partial_max(clip.y.x.ceil().partial_max(clip.z.x.ceil()));
+                let min_x = clip.x.x.floor().partial_min(clip.y.x.floor().partial_min(clip.z.x.floor()));
+                let max_y = clip.x.y.ceil().partial_max(clip.y.y.ceil().partial_max(clip.z.y.ceil()));
+                let min_y = clip.x.y.floor().partial_min(clip.y.y.floor().partial_min(clip.z.y.floor()));
 
-            let min_x = (max(min_x as i32, 0) as u32) & (0xFFFFFFFF & !0x3F);
-            let min_y = (max(min_y as i32, 0) as u32) & (0xFFFFFFFF & !0x3F);
-            let max_x = min(max_x as u32, w);
-            let max_y = min(max_y as u32, h);
-            let max_x = if max_x & (64-1) != 0 { max_x + (64 - (max_x & (64-1))) } else { max_x };
-            let max_y = if max_y & (64-1) != 0 { max_y + (64 - (max_y & (64-1))) } else { max_y };
+                let min_x = (max(min_x as i32, 0) as u32) & (0xFFFFFFFF & !0x3F);
+                let min_y = (max(min_y as i32, 0) as u32) & (0xFFFFFFFF & !0x3F);
+                let max_x = min(max_x as u32, w);
+                let max_y = min(max_y as u32, h);
+                let max_x = if max_x & (64-1) != 0 { max_x + (64 - (max_x & (64-1))) } else { max_x };
+                let max_y = if max_y & (64-1) != 0 { max_y + (64 - (max_y & (64-1))) } else { max_y };
 
-            let clip3 = Vector3::new(clip4.x.z, clip4.y.z, clip4.z.z);
-            let bary = Barycentric::new(clip);
+                let clip3 = Vector3::new(clip4.x.z, clip4.y.z, clip4.z.z);
+                let bary = Barycentric::new(clip);
 
-            for y in range_step(min_y, max_y, 64) {
-                for x in range_step(min_x, max_x, 64) {
-                    let tile = self.get_tile_mut((x/64) as usize, (y/64) as usize);
-                    tile.raster(x, y, &clip3, &bary, &or, &fragment);
+                for y in range_step(min_y, max_y, 64) {
+                    for x in range_step(min_x, max_x, 64) {
+                        let tile = self.get_tile_mut((x/64) as usize, (y/64) as usize);
+                        tile.raster(x, y, &clip3, &bary, &or, &fragment);
+                    }
                 }
             }
         }
