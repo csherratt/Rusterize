@@ -3,6 +3,7 @@ use std::mem;
 use cgmath::*;
 use super::vmath::Dot;
 use simd::HalfVector;
+use std::intrinsics::*;
 
 #[derive(Clone, Copy, Debug)]
 #[simd]
@@ -310,10 +311,12 @@ impl u32x8x8 {
     fn bitmask_low(&self) -> u32 {
         let mask = u32x8::broadcast(0x8000_0000);
         let scale = u32x8(0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80);
-         ((((self.0 & mask) >> u32x8::broadcast(31)) * scale) |
-          (((self.1 & mask) >> u32x8::broadcast(23)) * scale) |
-          (((self.2 & mask) >> u32x8::broadcast(15)) * scale) |
-          (((self.3 & mask) >> u32x8::broadcast(7)) * scale)).or_self()
+        unsafe {
+         (overflowing_mul(((self.0 & mask) >> u32x8::broadcast(31)), scale) |
+          overflowing_mul(((self.1 & mask) >> u32x8::broadcast(23)), scale) |
+          overflowing_mul(((self.2 & mask) >> u32x8::broadcast(15)), scale) |
+          overflowing_mul(((self.3 & mask) >> u32x8::broadcast(7)), scale)).or_self()
+        }
     }
 
     /// convert component 4-7 into a bitmask. If the value is negative
@@ -322,10 +325,12 @@ impl u32x8x8 {
     fn bitmask_high(&self) -> u32 {
         let mask = u32x8::broadcast(0x8000_0000);
         let scale = u32x8(0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80);
-        ((((self.4 & mask) >> u32x8::broadcast(31)) * scale) |
-         (((self.5 & mask) >> u32x8::broadcast(23)) * scale) |
-         (((self.6 & mask) >> u32x8::broadcast(15)) * scale) |
-         (((self.7 & mask) >> u32x8::broadcast(7)) * scale)).or_self() 
+        unsafe {
+        (overflowing_mul(((self.4 & mask) >> u32x8::broadcast(31)), scale) |
+         overflowing_mul(((self.5 & mask) >> u32x8::broadcast(23)), scale) |
+         overflowing_mul(((self.6 & mask) >> u32x8::broadcast(15)), scale) |
+         overflowing_mul(((self.7 & mask) >> u32x8::broadcast(7)), scale)).or_self()
+        }
     }
 
     /// convert component 0-7 into a bitmask. If the value is negative

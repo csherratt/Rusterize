@@ -10,7 +10,7 @@ extern crate obj;
 extern crate cgmath;
 extern crate time;
 
-use gfx::Device;
+use gfx::traits::*;
 use glfw::Context;
 use genmesh::{Triangulate, MapToVertices};
 use genmesh::generators::Cube;
@@ -41,7 +41,7 @@ fn main() {
     window.set_key_polling(true);
 
     let device = gfx_device_gl::GlDevice::new(|s| window.get_proc_address(s));
-    let mut graphics = gfx::Graphics::new(device);
+    let mut graphics = device.into_graphics();
 
     let texture_info = gfx::tex::TextureInfo {
         width: SIZE as u16, height: SIZE as u16, depth: 1, levels: 1,

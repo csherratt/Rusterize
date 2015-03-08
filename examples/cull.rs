@@ -11,7 +11,7 @@ extern crate cgmath;
 extern crate time;
 extern crate rand;
 
-use gfx::Device;
+use gfx::traits::*;
 use glfw::Context;
 use genmesh::*;
 use rusterize::{Frame, Fragment, Barycentric};
@@ -42,7 +42,7 @@ fn main() {
     window.set_key_polling(true);
 
     let device = gfx_device_gl::GlDevice::new(|s| window.get_proc_address(s));
-    let mut graphics = gfx::Graphics::new(device);
+    let mut graphics = device.into_graphics();
 
     let texture_info = gfx::tex::TextureInfo {
         width: SIZE as u16, height: SIZE as u16, depth: 1, levels: 1,
