@@ -179,7 +179,7 @@ impl Barycentric {
 pub struct Frame {
     pub width: u32,
     pub height: u32,
-    pub tile: Vec<Vec<TileGroup>>,
+    pub tile: Vec<Vec<Box<TileGroup>>>,
 }
 
 impl Frame {
@@ -187,7 +187,11 @@ impl Frame {
         Frame {
             width: width,
             height: height,
-            tile: (0..(height / 64)).map(|_| (0..(width / 64)).map(|_| TileGroup::new()).collect()).collect()
+            tile: (0..(height / 64)).map(
+                |_| (0..(width / 64)).map(
+                    |_| Box::new(TileGroup::new())
+                ).collect()
+            ).collect()
         }
     }
 
