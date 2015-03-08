@@ -160,7 +160,7 @@ fn main() {
         }
 
         let mut frame = Frame::new(SIZE, SIZE);
-        frame.simd_raster(plane, V{bary: bary});
+        frame.raster(plane, V{bary: bary});
 
         if show_grid != 0 {
             frame.draw_grid(show_grid, Rgba([128, 128, 128, 255]));

@@ -36,7 +36,7 @@ fn plane_simple(bench: &mut Bencher) {
     bench.iter(|| {
         frame.clear();
         let plane = generators::Plane::new();
-        frame.simd_raster(plane.triangulate()
+        frame.raster(plane.triangulate()
                          .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
             SetValue(Rgba([255, 255, 255, 255]))
         );
@@ -50,7 +50,7 @@ fn plane_subdivide(bench: &mut Bencher) {
     bench.iter(|| {
         frame.clear();
         let plane = generators::Plane::subdivide(128, 128);
-        frame.simd_raster(plane.triangulate()
+        frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
             SetValue(Rgba([255, 255, 255, 255]))
         );
@@ -64,7 +64,7 @@ fn plane_backface(bench: &mut Bencher) {
     bench.iter(|| {
         frame.clear();
         let plane = generators::Plane::new();
-        frame.simd_raster(plane.triangulate()
+        frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(-v.0, v.1, 0., 1.).into_fixed()),
             SetValue(Rgba([255, 255, 255, 255]))
         );
@@ -78,11 +78,11 @@ fn plane_front_back(bench: &mut Bencher) {
     bench.iter(|| {
         frame.clear();
         let plane = generators::Plane::new();
-        frame.simd_raster(plane.triangulate()
+        frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 1., 1.).into_fixed()),
             SetValue(Rgba([255, 255, 255, 255]))
         );
-        frame.simd_raster(plane.triangulate()
+        frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
             SetValue(Rgba([128, 128, 128, 255]))
         );
@@ -96,11 +96,11 @@ fn plane_back_front(bench: &mut Bencher) {
     bench.iter(|| {
         frame.clear();
         let plane = generators::Plane::new();
-        frame.simd_raster(plane.triangulate()
+        frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
             SetValue(Rgba([255, 255, 255, 255]))
         );
-        frame.simd_raster(plane.triangulate()
+        frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 1., 1.).into_fixed()),
             SetValue(Rgba([128, 128, 128, 255]))
         );
@@ -129,7 +129,7 @@ fn monkey(bench: &mut Bencher) {
                            .triangulate();
 
         frame.clear();
-        frame.simd_raster(vertex, SetValue(Rgba([255, 255, 255, 255])));
+        frame.raster(vertex, SetValue(Rgba([255, 255, 255, 255])));
     });
 }
 

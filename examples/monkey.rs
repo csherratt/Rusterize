@@ -152,9 +152,9 @@ fn main() {
 
         frame.clear();
         if !raster_order {
-            frame.simd_raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
+            frame.raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
         } else {
-            frame.simd_raster(vertex, RO{v: Arc::new(AtomicUsize::new(0))});
+            frame.raster(vertex, RO{v: Arc::new(AtomicUsize::new(0))});
         }
         if show_grid != 0 {
             frame.draw_grid(show_grid, Rgba([128, 128, 128, 255]));

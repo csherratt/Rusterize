@@ -219,7 +219,7 @@ impl Frame {
         buffer
     }
 
-    pub fn simd_raster<S, F, T, O>(&mut self, poly: S, fragment: F)
+    pub fn raster<S, F, T, O>(&mut self, poly: S, fragment: F)
         where S: Iterator<Item=Triangle<T>>,
               T: Clone + Interpolate<Out=O> + FetchPosition,
               F: Fragment<O, Color=Rgba<u8>> {
