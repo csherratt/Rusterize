@@ -163,7 +163,7 @@ fn main() {
         frame.simd_raster(plane, V{bary: bary});
 
         if show_grid != 0 {
-            //frame.draw_grid(show_grid, Rgba([128, 128, 128, 255]));
+            frame.draw_grid(show_grid, Rgba([128, 128, 128, 255]));
         }
         graphics.device.update_texture(&texture, &image_info, frame.to_image().as_slice()).unwrap();
 

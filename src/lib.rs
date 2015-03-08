@@ -271,16 +271,17 @@ impl Frame {
         }
     }
 
-    /*/// draw grid line over the frame buffer. This is mostly a debug feature
+    /// draw grid line over the frame buffer. This is mostly a debug feature
     pub fn draw_grid(&mut self, spacing: u32, color: Rgba<u8>) {
-        let h = self.frame.height();
-        let w = self.frame.width();
+        let h = self.height;
+        let w = self.width;
 
         let mut put = |x, y| {
             if x < w && y < h {
-                self.frame.put_pixel(x, y, color);
+                let tx = (x / 64) as usize;
+                let ty = (y / 64) as usize;
+                self.tile[tx][ty].put(x % 64, y % 64, color);
             }
-
         };
 
         for x in range_step_inclusive(0, w, spacing) {
@@ -297,7 +298,7 @@ impl Frame {
                 put(x+1, y);
             }
         }
-    }*/
+    }
 }
 
 

@@ -54,6 +54,10 @@ impl TileMask {
 pub struct TileIndex(pub u32);
 
 impl TileIndex {
+    #[inline]
+    pub fn from_xy(x: u32, y: u32) -> TileIndex {
+        TileIndex(x*8+y)
+    }
     #[inline] pub fn x(self) -> u32 { (self.0 as u32)  & 0x7 }
     #[inline] pub fn y(self) -> u32 { (self.0 as u32)  >> 3 }
     #[inline] pub fn x8(self) -> u32 { self.x() * 8 }
@@ -154,6 +158,11 @@ impl Tile {
         self.depth = f32x8x8::broadcast(1.);
         self.color = [Rgba([0, 0, 0, 0]); 64];
     }
+
+    #[inline]
+    pub fn put(&mut self, idx: TileIndex, value: Rgba<u8>) {
+        self.color[idx.0 as usize] = value;
+    }
 }
 
 #[derive(Copy)]
@@ -221,5 +230,12 @@ impl TileGroup {
         for tile in self.tiles.iter_mut() {
             tile.clear()
         }
+    }
+
+    #[inline]
+    pub fn put(&mut self, x: u32, y: u32, value: Rgba<u8>) {
+        let gidx = TileIndex::from_xy(x / 8, y / 8);
+        let idx = TileIndex::from_xy(x & 0x7, y & 0x7);
+        self.tiles[gidx.0 as usize].put(idx, value);
     }
 }
