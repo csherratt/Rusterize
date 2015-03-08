@@ -30,21 +30,7 @@ impl Fragment<([f32; 4], [f32; 3])> for SetValue {
 }
 
 #[bench]
-fn plane_simple_normal(bench: &mut Bencher) {
-    let mut frame = Frame::new(SIZE, SIZE);
-
-    bench.iter(|| {
-        frame.clear();
-        let plane = generators::Plane::new();
-        frame.normal_raster(plane.triangulate()
-                          .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
-            SetValue(Rgba([255, 255, 255, 255]))
-        );
-    });
-}
-
-#[bench]
-fn plane_simple_simd(bench: &mut Bencher) {
+fn plane_simple(bench: &mut Bencher) {
     let mut frame = Frame::new(SIZE, SIZE);
 
     bench.iter(|| {
@@ -129,26 +115,7 @@ fn buffer_clear(bench: &mut Bencher) {
 }
 
 #[bench]
-fn monkey_normal(bench: &mut Bencher) {
-    let obj = obj::load(&Path::new("test_assets/monkey.obj")).unwrap();
-    let monkey = obj.object_iter().next().unwrap().group_iter().next().unwrap();
-
-    let proj = ortho(-1.5, 1.5, -1.5, 1.5, -10., 10.);
-    let mut frame = Frame::new(SIZE, SIZE);
-
-    bench.iter(|| {
-        let vertex = monkey.indices().iter().map(|x| *x)
-                           .vertex(|(p, _, n)| { (obj.position()[p], obj.normal()[n.unwrap()]) })
-                           .vertex(|(p, n)| (proj.mul_v(&Vector4::new(p[0], p[1], p[2], 1.)).into_fixed(), n))
-                           .triangulate();
-
-        frame.clear();
-        frame.normal_raster(vertex, SetValue(Rgba([255, 255, 255, 255])));
-    });
-}
-
-#[bench]
-fn monkey_simd(bench: &mut Bencher) {
+fn monkey(bench: &mut Bencher) {
     let obj = obj::load(&Path::new("test_assets/monkey.obj")).unwrap();
     let monkey = obj.object_iter().next().unwrap().group_iter().next().unwrap();
 

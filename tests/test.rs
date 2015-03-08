@@ -16,12 +16,14 @@ use image::{Rgba, Luma, ImageBuffer};
 const SIZE: u32 = 64;
 
 fn check(name: &str, frame: Frame) {
+    let frame = frame.to_image();
+
     // Save the image output just incase the test fails
     let mut fout = File::create(&Path::new("test_data/results").join(format!("{}.frame.png", name))).unwrap();
-    let _= image::ImageRgba8(frame.frame.clone()).save(&mut fout, image::PNG);
+    let _= image::ImageRgba8(frame.clone()).save(&mut fout, image::PNG);
 
     let expected = image::open(&Path::new("test_data/expected").join(format!("{}.frame.png", name))).unwrap();
-    assert!(expected.raw_pixels() == frame.frame.as_slice());
+    assert!(expected.raw_pixels() == frame.as_slice());
 }
 
 fn proj() -> Matrix4<f32> {

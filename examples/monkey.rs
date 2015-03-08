@@ -61,7 +61,6 @@ fn main() {
     let mut frame = Frame::new(SIZE, SIZE);
 
     let texture = graphics.device.create_texture(texture_info).unwrap();
-    graphics.device.update_texture(&texture, &image_info, frame.frame.as_slice()).unwrap();
 
     let mut texture_frame = gfx::Frame::new(SIZE as u16, SIZE as u16);
     texture_frame.colors.push(gfx::Plane::Texture(texture, 0, None));
@@ -158,9 +157,9 @@ fn main() {
             frame.simd_raster(vertex, RO{v: Arc::new(AtomicUsize::new(0))});
         }
         if show_grid != 0 {
-            frame.draw_grid(show_grid, Rgba([128, 128, 128, 255]));
+            //frame.draw_grid(show_grid, Rgba([128, 128, 128, 255]));
         }
-        graphics.device.update_texture(&texture, &image_info, frame.frame.as_slice()).unwrap();
+        graphics.device.update_texture(&texture, &image_info, frame.to_image().as_slice()).unwrap();
 
         graphics.renderer.blit(&texture_frame,
             gfx::Rect{x: 0, y: 0, w: SIZE as u16, h: SIZE as u16},

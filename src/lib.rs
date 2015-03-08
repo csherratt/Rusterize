@@ -44,152 +44,6 @@ pub fn is_backface(v: Triangle<Vector3<f32>>)-> bool {
     Vector3::new(0., 0., 1.).dot(&normal) >= 0.
 }
 
-#[inline]
-fn sort_vertex_y(v: &mut Triangle<Vector2<f32>>) {
-    use std::mem::swap;
-
-    if v.x.y >= v.y.y {
-        swap(&mut v.x, &mut v.y);
-    }
-    if v.y.y >= v.z.y {
-        swap(&mut v.y, &mut v.z);
-    }
-    if v.x.y >= v.y.y {
-        swap(&mut v.x, &mut v.y);
-    }
-}
-
-/// described a scanline
-#[derive(Debug, Copy, PartialEq)]
-pub struct Scanline {
-    pub start: f32,
-    pub end: f32,
-}
-
-pub type ScanlineIter = std::ops::Range<i32>;
-
-impl Scanline {
-    /// create a new scanline between two points, a & b
-    /// this is inclusive, so if a == b one point is valid
-    #[inline]
-    pub fn new(a: f32, b: f32) -> Scanline {
-        if a > b {
-            Scanline { start: b, end: a }
-        } else {
-            Scanline { start: a, end: b }
-        }
-    }
-
-    /// limit, limit a scanline between to points
-    /// min and max are inclusive. If a screen buffer is 64 pixels wide
-    /// you will need to call `limit(0, 63)` for example.
-    #[inline]
-    pub fn limit_iter(self, min: i32, max: i32) -> ScanlineIter {
-        let mut start = self.start.ceil() as i32;
-        let mut end = self.end.floor() as i32 + 1;
-        if start < min {
-            start = min;
-        } else if start > max {
-            start = max;
-        }
-        if end < min {
-            end = min;
-        } else if end > max {
-            end = max;
-        }
-        start..end
-    }
-
-    /// create an ScanlineIter from 
-    pub fn iter(self) -> ScanlineIter {
-        (self.start.ceil() as i32)..(self.end.floor() as i32 +1)
-    }
-}
-
-#[derive(Debug)]
-pub struct RasterTriangle {
-    bottom: FlatTriangleIter,
-    top: FlatTriangleIter
-}
-
-impl RasterTriangle {
-    pub fn new(mut a: Triangle<Vector2<f32>>) -> RasterTriangle {
-        sort_vertex_y(&mut a);
-        let v = Vector2::new(a.x.x + ((a.y.y - a.x.y) / (a.z.y - a.x.y)) * (a.z.x - a.x.x),
-                             a.y.y);
-   
-        RasterTriangle {
-            bottom: FlatTriangleIter::new_bottom(Triangle::new(a.x, a.y, v)),
-            top: FlatTriangleIter::new_top(Triangle::new(a.y, v, a.z)),
-        }
-    }
-}
-
-impl Iterator for RasterTriangle {
-    type Item = (i32, Scanline);
-
-    fn next(&mut self) -> Option<(i32, Scanline)> {
-        if let Some(x) = self.bottom.next() {
-            return Some(x);
-        }
-        self.top.next()
-    }
-}
-
-#[derive(Debug)]
-pub struct FlatTriangleIter {
-    range: ScanlineIter,
-    slope: [f32; 2],
-    cursor: [f32; 2],
-    base: [f32; 2]
-}
-
-impl FlatTriangleIter {
-    pub fn new_bottom(mut a: Triangle<Vector2<f32>>) -> FlatTriangleIter {
-        use std::mem::swap;
-
-        if a.y.x > a.z.x {
-            swap(&mut a.y, &mut a.z);
-        }
-
-        FlatTriangleIter {
-            range: Scanline::new(a.x.y, a.z.y).iter(),
-            slope: [(a.x.x - a.y.x) / (a.x.y - a.y.y),
-                    (a.x.x - a.z.x) / (a.x.y - a.z.y)],
-            cursor: [a.x.x, a.x.x],
-            base: [a.x.y, a.x.y]
-        }
-    }
-
-    pub fn new_top(mut a: Triangle<Vector2<f32>>) -> FlatTriangleIter {
-        use std::mem::swap;
-
-        if a.x.x > a.y.x {
-            swap(&mut a.x, &mut a.y);
-        }
-
-        FlatTriangleIter {
-            range: Scanline::new(a.x.y, a.z.y).iter(),
-            slope: [(a.z.x - a.x.x) / (a.z.y - a.x.y),
-                    (a.z.x - a.y.x) / (a.z.y - a.y.y)],
-            cursor: [a.x.x, a.y.x],
-            base: [a.y.y, a.y.y]
-        }
-    }
-}
-
-impl Iterator for FlatTriangleIter {
-    type Item = (i32, Scanline);
-    fn next(&mut self) -> Option<(i32, Scanline)> {
-        self.range.next().map(|y| {
-            let yf = y as f32;
-            let s = (yf - self.base[0]) * self.slope[0] + self.cursor[0];
-            let e = (yf - self.base[1]) * self.slope[1] + self.cursor[1];
-            (y, Scanline::new(s, e))
-        })
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 pub struct Barycentric {
     pub v0: Vector2<f32>,
@@ -323,28 +177,21 @@ impl Barycentric {
 
 #[derive(Clone)]
 pub struct Frame {
-    pub frame: ImageBuffer<Rgba<u8>, Vec<u8>>,
-    pub depth: ImageBuffer<Luma<f32>, Vec<f32>>,
+    pub width: u32,
+    pub height: u32,
     pub tile: Vec<Vec<TileGroup>>,
 }
 
 impl Frame {
     pub fn new(width: u32, height: u32) -> Frame {
-        let buffer = ImageBuffer::new(width, height);
         Frame {
-            frame: buffer,
-            depth: ImageBuffer::from_pixel(width, height, Luma([1.])),
+            width: width,
+            height: height,
             tile: (0..(height / 64)).map(|_| (0..(width / 64)).map(|_| TileGroup::new()).collect()).collect()
         }
     }
 
     pub fn clear(&mut self) {
-        for pixel in self.frame.as_mut_slice().iter_mut() {
-            *pixel = 0;
-        }
-        for depth in self.depth.as_mut_slice().iter_mut() {
-            *depth = 1.;
-        }
         for row in self.tile.iter_mut() {
             for tile in row.iter_mut() {
                 tile.clear();
@@ -356,12 +203,16 @@ impl Frame {
         return &mut self.tile[x][y]
     }
 
-    fn sync(&mut self) {
+    pub fn to_image(&self) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+        let mut buffer = ImageBuffer::new(self.width, self.height);
+
         for (x, row) in self.tile.iter().enumerate() {
             for (y, tile) in row.iter().enumerate() {
-                tile.write((x*64) as u32, (y*64) as u32, &mut self.frame);
+                tile.write((x*64) as u32, (y*64) as u32, &mut buffer);
             }
         }
+
+        buffer
     }
 
     pub fn simd_raster<S, F, T, O>(&mut self, poly: S, fragment: F)
@@ -370,8 +221,8 @@ impl Frame {
               F: Fragment<O, Color=Rgba<u8>> {
 
         use std::cmp::{min, max};
-        let h = self.frame.height();
-        let w = self.frame.width();
+        let h = self.height;
+        let w = self.width;
         let (hf, wf) = (h as f32, w as f32);
         let (hh, wh) = (hf/2., wf/2.);
         for or in poly {
@@ -418,121 +269,9 @@ impl Frame {
                 }
             }
         }
-
-        self.sync();
     }
 
-    pub fn normal_raster<S, F, T, O>(&mut self, poly: S, fragment: F)
-        where S: Iterator<Item=Triangle<T>>,
-              T: Clone + Interpolate<Out=O> + FetchPosition,
-              F: Fragment<O, Color=Rgba<u8>> {
-
-        let h = self.frame.height();
-        let w = self.frame.width();
-        let (hf, wf) = (h as f32, w as f32);
-        let (hh, wh) = (hf/2., wf/2.);
-        for or in poly {
-            let t = or.clone().map_vertex(|v| {
-                let v = v.position();
-                Vector4::new(v[0], v[1], v[2], v[3])
-            });
-
-            let clip4 = t.map_vertex(|v| {
-                Vector4::new(
-                    hh * (v.x / v.w) + hh,
-                    wh * (v.y / v.w) + wh,
-                    v.z / v.w,
-                    v.w / v.w
-                )
-            });
-
-            // cull any backface triangles
-            if is_backface(clip4.map_vertex(|v| Vector3::new(v.x, v.y, v.z))) {
-                continue;
-            }
-
-            let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
-            let bary = Barycentric::new(clip);
-
-            for (y, line) in RasterTriangle::new(clip) {
-                let y = y as u32;
-                if y >= h { continue; }
-
-                for x in line.limit_iter(0, w as i32) {
-                    let x = x as u32;
-                    let p = Vector2::new(x as f32, y as f32);
-                    let &Luma(dz) = self.depth.get_pixel(x, h-y-1);
-
-                    let cood = bary.coordinate(p);
-                    let w = cood.weights();
-
-                    let z = w[0] * clip4.x.z + w[1] * clip4.y.z + w[2] * clip4.z.z;
-
-                    if cood.inside() && z >= -1. && dz[0] > z {
-                        let frag = Interpolate::interpolate(&or, w);
-                        self.frame.put_pixel(x, h-y-1, fragment.fragment(frag));
-                        self.depth.put_pixel(x, h-y-1, Luma([z]));
-                    }
-                }
-            }
-        }
-    }
-
-    /// This is an extramly slow render that is designed to find missing fragments.
-    pub fn debug_raster<S, F, T, O>(&mut self, poly: S, fragment: F)
-        where S: Iterator<Item=Triangle<T>>,
-              T: Clone + Interpolate<Out=O> + FetchPosition,
-              F: Fragment<O, Color=Rgba<u8>> {
-
-        let h = self.frame.height();
-        let w = self.frame.width();
-        let (hf, wf) = (h as f32, w as f32);
-        let (hh, wh) = (hf/2., wf/2.);
-        for or in poly {
-            let t = or.clone().map_vertex(|v| {
-                let v = v.position();
-                Vector4::new(v[0], v[1], v[2], v[3])
-            });
-
-            let clip4 = t.map_vertex(|v| {
-                Vector4::new(
-                    hh * (v.x / v.w) + hh,
-                    wh * (v.y / v.w) + wh,
-                    v.z / v.w,
-                    v.w / v.w
-                )
-            });
-
-            // cull any backface triangles
-            if is_backface(clip4.map_vertex(|v| Vector3::new(v.x, v.y, v.z))) {
-                continue;
-            }
-
-            let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
-            let bary = Barycentric::new(clip);
-
-            for y in 0..h {
-                for x in 0..w {
-                    let x = x as u32;
-                    let p = Vector2::new(x as f32, y as f32);
-                    let &Luma(dz) = self.depth.get_pixel(x, h-y-1);
-
-                    let cood = bary.coordinate(p);
-                    let w = cood.weights();
-
-                    let z = w[0] * clip4.x.z + w[1] * clip4.y.z + w[2] * clip4.z.z;
-
-                    if cood.inside() && z >= -1. && dz[0] > z {
-                        let frag = Interpolate::interpolate(&or, w);
-                        self.frame.put_pixel(x, h-y-1, fragment.fragment(frag));
-                        self.depth.put_pixel(x, h-y-1, Luma([z]));
-                    }
-                }
-            }
-        }
-    }
-
-    /// draw grid line over the frame buffer. This is mostly a debug feature
+    /*/// draw grid line over the frame buffer. This is mostly a debug feature
     pub fn draw_grid(&mut self, spacing: u32, color: Rgba<u8>) {
         let h = self.frame.height();
         let w = self.frame.width();
@@ -558,7 +297,7 @@ impl Frame {
                 put(x+1, y);
             }
         }
-    }
+    }*/
 }
 
 
