@@ -7,7 +7,7 @@ use image::{Rgba, ImageBuffer};
 use genmesh::Triangle;
 
 use {Barycentric, Interpolate, Fragment};
-use f32x8::{f32x8, f32x8x8, f32x8x8_vec3};
+use f32x8::{f32x8x8, f32x8x8_vec3};
 
 #[derive(Copy, Debug)]
 pub struct TileMask {
@@ -128,7 +128,6 @@ impl Tile {
 
     #[inline]
     pub fn write(&self, x: u32, y: u32, v: &mut ImageBuffer<Rgba<u8>, Vec<u8>>) {
-        let mut color = [Rgba([0, 0, 0, 0]); 64];
         for i in (0..64).map(|x| TileIndex(x)) {
             v.put_pixel(x+i.x(), y+i.y(), self.color[i.0 as usize]);
         }

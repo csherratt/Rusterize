@@ -144,6 +144,26 @@ fn trailing_zeros(bench: &mut Bencher) {
 }
 
 #[bench]
+fn barycentric_coord(bench: &mut Bencher) {
+    use rusterize::Barycentric;
+
+    let tri = Triangle::new(Vector4::new(0., 0., 0., 0.),
+                            Vector4::new(1., 1., 0., 0.),
+                            Vector4::new(0., 1., 0., 0.));
+
+    let mut x = 0.;
+    let mut y = 0.;
+
+    let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
+
+    bench.iter(|| {
+        black_box(bary.coordinate(Vector2::new(x, y)));
+        x += 1.;
+        y += 1.;
+    });
+}
+
+#[bench]
 fn barycentric_f32x4(bench: &mut Bencher) {
     use rusterize::Barycentric;
 

@@ -103,7 +103,7 @@ fn main() {
             // Slowly circle the center
             let x = (0.25*time).sin();
             let y = (0.25*time).cos();
-            Point3::new(x * 4.0, y * 4.0, 4.0)
+            Point3::new(x * 2.0, y * 2.0, 2.0)
         };
         let view: AffineMatrix3<f32> = Transform::look_at(
             &cam_pos,
@@ -145,7 +145,7 @@ fn main() {
 
             #[inline]
             fn fragment(&self, (_, n) : ([f32; 4], [f32; 3])) -> Rgba<u8> {
-                let x = self.v.fetch_add(16, Ordering::SeqCst);
+                let x = self.v.fetch_add(1, Ordering::SeqCst);
                 Rgba([(x >> 5) as u8, (x >> 9) as u8, (x >> 12) as u8, 255])
             }
         }

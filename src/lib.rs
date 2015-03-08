@@ -1,20 +1,21 @@
-#![feature(simd, unboxed_closures, core)]
+#![feature(simd, unboxed_closures, core, collections)]
 #![allow(non_camel_case_types)]
 
 extern crate image;
 extern crate genmesh;
 extern crate cgmath;
-extern crate simd;
 
-use std::num::Float;
-use std::ops::Range;
+use std::num::{Float, Int};
 use std::sync::Arc;
 use std::iter::{range_step, range_step_inclusive};
+use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
+use std::fmt::Debug;
 
-use image::{GenericImage, ImageBuffer, Rgba, Luma};
+use image::{GenericImage, ImageBuffer, Rgba};
 use cgmath::*;
 use genmesh::{Triangle, MapVertex};
-use tile::{TileMask, Tile, TileGroup};
+use tile::TileGroup;
 use vmath::Dot;
 use f32x8::f32x8x8;
 
@@ -255,7 +256,7 @@ impl Frame {
 
     pub fn raster<S, F, T, O>(&mut self, mut poly: S, fragment: F)
         where S: Iterator<Item=Triangle<T>>,
-              T: Clone + Interpolate<Out=O> + FetchPosition,
+              T: Clone + Interpolate<Out=O> + FetchPosition + Debug,
               F: Fragment<O, Color=Rgba<u8>> {
 
         use std::cmp::{min, max};
@@ -270,7 +271,9 @@ impl Frame {
                 break;
             }
 
-            for &(ref clip4, ref or) in group.0.iter() {
+            let mut apply: BTreeMap<(u32, u32), u64> = BTreeMap::new();
+
+            for (idx, &(ref clip4, _)) in group.0.iter().enumerate() {
                 let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
 
                 let max_x = clip.x.x.ceil().partial_max(clip.y.x.ceil().partial_max(clip.z.x.ceil()));
@@ -285,15 +288,34 @@ impl Frame {
                 let max_x = if max_x & (64-1) != 0 { max_x + (64 - (max_x & (64-1))) } else { max_x };
                 let max_y = if max_y & (64-1) != 0 { max_y + (64 - (max_y & (64-1))) } else { max_y };
 
-                let clip3 = Vector3::new(clip4.x.z, clip4.y.z, clip4.z.z);
-                let bary = Barycentric::new(clip);
-
                 for y in range_step(min_y, max_y, 64) {
                     for x in range_step(min_x, max_x, 64) {
-                        let tile = self.get_tile_mut((x/64) as usize, (y/64) as usize);
-                        tile.raster(x, y, &clip3, &bary, &or, &fragment);
+                        match apply.entry((y/64, x/64)) {
+                            Entry::Occupied(mut entry) => *entry.get_mut() |= 1 << idx as u64,
+                            Entry::Vacant(entry) => { entry.insert(1 << idx as u64); }
+                        }
                     }
                 }
+            }
+
+            for ((y, x), mut mask) in apply.into_iter() {
+                let tile = self.get_tile_mut(x as usize, y as usize);
+
+                while mask != 0 {
+                    let next = mask.trailing_zeros();
+                    mask &= !(1 << next);
+
+                    let (clip4, ref or) = group.0[next as usize];
+                    let clip3 = Vector3::new(clip4.x.z, clip4.y.z, clip4.z.z);
+                    let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
+                    let bary = Barycentric::new(clip);
+
+                    tile.raster(x*64, y*64, &clip3, &bary, or, &fragment);
+                }
+            }
+
+            if group.0.len() < 64 {
+                break;
             }
         }
     }

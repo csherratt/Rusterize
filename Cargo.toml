@@ -14,13 +14,6 @@ cgmath = "*"
 [dependencies.image]
 git = "https://github.com/PistonDevelopers/image"
 
-[dependencies]
-obj="*"
-glfw="*"
-time="*"
-rand="*"
-simd="*"
-llvmint="*"
 
 [[example]]
 name = "monkey"
@@ -30,8 +23,10 @@ path = "examples/monkey.rs"
 name = "cull"
 path = "examples/cull.rs"
 
-[dependencies.gfx]
-git = "https://github.com/gfx-rs/gfx-rs.git"
-
-[dependencies.gfx_device_gl]
-git = "https://github.com/gfx-rs/gfx_device_gl.git"
+[dev-dependencies]
+obj="*"
+glfw="*"
+time="*"
+rand="*"
+gfx="*"
+gfx_device_gl="*"

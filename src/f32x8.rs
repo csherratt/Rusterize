@@ -2,7 +2,6 @@ use std::ops::*;
 use std::mem;
 use cgmath::*;
 use super::vmath::Dot;
-use simd::HalfVector;
 use std::intrinsics::*;
 
 #[derive(Clone, Copy, Debug)]

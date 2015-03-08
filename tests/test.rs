@@ -1,4 +1,4 @@
-#![feature(path, io, core)]
+#![feature(old_path, old_io)]
 
 extern crate image;
 extern crate genmesh;
@@ -11,7 +11,7 @@ use cgmath::*;
 use genmesh::generators;
 use genmesh::{Triangulate, MapToVertices};
 use std::old_io::File;
-use image::{Rgba, Luma, ImageBuffer};
+use image::Rgba;
 
 const SIZE: u32 = 64;
 
@@ -36,7 +36,7 @@ struct SetValue(Rgba<u8>);
 impl Fragment<[f32; 4]> for SetValue {
     type Color = Rgba<u8>;
 
-    fn fragment(&self, v: [f32; 4]) -> Rgba<u8> { self.0 }
+    fn fragment(&self, _: [f32; 4]) -> Rgba<u8> { self.0 }
 }
 
 #[test]
