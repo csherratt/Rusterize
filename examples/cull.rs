@@ -55,7 +55,7 @@ fn main() {
     let texture = graphics.device.create_texture(texture_info).unwrap();
 
     let mut texture_frame = gfx::Frame::new(SIZE as u16, SIZE as u16);
-    texture_frame.colors.push(gfx::Plane::Texture(texture, 0, None));
+    texture_frame.colors.push(gfx::Plane::Texture(texture.clone(), 0, None));
 
     let mut show_grid = 0;
     let mut raster_order = false;
