@@ -10,6 +10,7 @@ path = "src/lib.rs"
 [dependencies]
 genmesh = "*"
 cgmath = "*"
+threadpool = "*"
 
 [dependencies.image]
 git = "https://github.com/PistonDevelopers/image"

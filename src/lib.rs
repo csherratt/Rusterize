@@ -4,21 +4,23 @@
 extern crate image;
 extern crate genmesh;
 extern crate cgmath;
+extern crate threadpool;
 
 use std::num::{Float, Int};
-use std::sync::Arc;
+use std::sync::{Arc, Future};
 use std::iter::{range_step, range_step_inclusive};
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use std::fmt::Debug;
 
+use threadpool::ScopedPool;
 use image::{GenericImage, ImageBuffer, Rgba};
 use cgmath::*;
 use genmesh::{Triangle, MapVertex};
+
 use tile::TileGroup;
 use vmath::Dot;
 use f32x8::f32x8x8;
-
 pub use pipeline::{Fragment, Vertex};
 pub use interpolate::{Flat, Interpolate};
 
@@ -256,14 +258,21 @@ impl Frame {
 
     pub fn raster<S, F, T, O>(&mut self, mut poly: S, fragment: F)
         where S: Iterator<Item=Triangle<T>>,
-              T: Clone + Interpolate<Out=O> + FetchPosition + Debug,
-              F: Fragment<O, Color=Rgba<u8>> {
+              T: Clone + Interpolate<Out=O> + FetchPosition + Send + Sync,
+              F: Fragment<O, Color=Rgba<u8>> + Send + Sync {
 
         use std::cmp::{min, max};
         let h = self.height;
         let w = self.width;
         let (hf, wf) = (h as f32, w as f32);
         let (hh, wh) = (hf/2., wf/2.);
+
+        let mut commands: Vec<Vec<Vec<(u64, Arc<TriangleGroup<T>>)>>> =
+            (0..(h / 64)).map( 
+                |_| (0..(w / 64)).map(
+                    |_| Vec::new()
+                ).collect()
+            ).collect();
 
         loop {
             let group = Arc::new(TriangleGroup::from_iter(&mut poly, hh, wh));
@@ -298,26 +307,47 @@ impl Frame {
                 }
             }
 
-            for ((y, x), mut mask) in apply.into_iter() {
-                let tile = self.get_tile_mut(x as usize, y as usize);
-
-                while mask != 0 {
-                    let next = mask.trailing_zeros();
-                    mask &= !(1 << next);
-
-                    let (clip4, ref or) = group.0[next as usize];
-                    let clip3 = Vector3::new(clip4.x.z, clip4.y.z, clip4.z.z);
-                    let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
-                    let bary = Barycentric::new(clip);
-
-                    tile.raster(x*64, y*64, &clip3, &bary, or, &fragment);
-                }
+            for ((y, x), mask) in apply.into_iter() {
+                commands[x as usize][y as usize].push((mask, group.clone()));
             }
 
             if group.0.len() < 64 {
                 break;
             }
         }
+
+
+        let fragment = Arc::new(fragment);
+        {
+            let pool = ScopedPool::new(8);
+            for (x, (row, row_commands)) in self.tile.iter_mut().zip(commands.into_iter()).enumerate() {
+                for (y, (tile, tile_command)) in row.iter_mut().zip(row_commands.into_iter()).enumerate() {
+                    if tile_command.len() == 0 {
+                        continue;
+                    }
+
+                    let x = x as u32;
+                    let y = y as u32;
+                    let fragment = fragment.clone();
+                    pool.execute(move || {
+                        for (mut mask, group) in tile_command.into_iter() {
+                            while mask != 0 {
+                                let next = mask.trailing_zeros();
+                                mask &= !(1 << next);
+
+                                let (clip4, ref or) = group.0[next as usize];
+                                let clip3 = Vector3::new(clip4.x.z, clip4.y.z, clip4.z.z);
+                                let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
+                                let bary = Barycentric::new(clip);
+
+                                tile.raster(x*64, y*64, &clip3, &bary, or, &*fragment);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
     }
 
     /// draw grid line over the frame buffer. This is mostly a debug feature
