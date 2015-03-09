@@ -8,12 +8,13 @@ extern crate threadpool;
 
 use std::num::{Float, Int};
 use std::sync::{Arc, Future};
+use std::sync::mpsc::channel;
 use std::iter::{range_step, range_step_inclusive};
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use std::fmt::Debug;
 
-use threadpool::ScopedPool;
+use threadpool::ThreadPool;
 use image::{GenericImage, ImageBuffer, Rgba};
 use cgmath::*;
 use genmesh::{Triangle, MapVertex};
@@ -134,7 +135,7 @@ impl Barycentric {
          (d00 * d12 - d01 * d02) * inv_denom]
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn coordinate_f32x8x8(&self, p: Vector2<f32>, s: Vector2<f32>) -> [f32x8::f32x8x8; 2] {
         use f32x8::{f32x8x8, f32x8x8_vec2};
         let v2 = p - self.base;
@@ -179,44 +180,11 @@ impl Barycentric {
     }
 }
 
-struct TriangleGroup<T>(Vec<(Triangle<Vector4<f32>>, Triangle<T>)>);
-
-impl<T> TriangleGroup<T> {
-    fn from_iter<S, O>(poly: &mut S, wh: f32, hh: f32) -> TriangleGroup<T>
-        where S: Iterator<Item=Triangle<T>>,
-              T: Clone + Interpolate<Out=O> + FetchPosition {
-
-        TriangleGroup(
-            poly.map(|or| {
-                let t = or.clone().map_vertex(|v| {
-                    let v = v.position();
-                    Vector4::new(v[0], v[1], v[2], v[3])
-                });
-
-                let clip4 = t.map_vertex(|v| {
-                    Vector4::new(
-                        wh * (v.x / v.w) + wh,
-                        -hh * (v.y / v.w) + hh,
-                        v.z / v.w,
-                        v.w / v.w
-                    )
-                });
-
-                (clip4, or)
-            }).filter(|&(ref clip4, _)| {
-                is_backface(clip4.map_vertex(|v| Vector3::new(v.x, v.y, v.z)))
-            }).take(64).collect()
-        )
-
-    }
-}
-
-
-#[derive(Clone)]
 pub struct Frame {
     pub width: u32,
     pub height: u32,
-    pub tile: Vec<Vec<Box<TileGroup>>>,
+    pub tile: Vec<Vec<Future<Box<TileGroup>>>>,
+    pool: ThreadPool
 }
 
 impl Frame {
@@ -226,30 +194,36 @@ impl Frame {
             height: height,
             tile: (0..(height / 64)).map(
                 |_| (0..(width / 64)).map(
-                    |_| Box::new(TileGroup::new())
+                    |_| Future::from_value(Box::new(TileGroup::new()))
                 ).collect()
-            ).collect()
+            ).collect(),
+            pool: ThreadPool::new(16)
         }
     }
 
     pub fn clear(&mut self) {
+        use std::mem;
         for row in self.tile.iter_mut() {
             for tile in row.iter_mut() {
-                tile.clear();
+                let (tx, rx) = channel();
+                let mut new = Future::from_receiver(rx);
+                mem::swap(tile, &mut new);
+                self.pool.execute(move || {
+                    let mut t = new.get();
+                    t.clear();
+                    tx.send(t);
+                });
             }
         }
     }
 
-    fn get_tile_mut(&mut self, x: usize, y: usize) -> &mut TileGroup {
-        return &mut self.tile[x][y]
-    }
-
-    pub fn to_image(&self) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+    pub fn to_image(&mut self) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
         let mut buffer = ImageBuffer::new(self.width, self.height);
 
-        for (x, row) in self.tile.iter().enumerate() {
-            for (y, tile) in row.iter().enumerate() {
-                tile.write((x*64) as u32, (y*64) as u32, &mut buffer);
+        for (x, row) in self.tile.iter_mut().enumerate() {
+            for (y, tile) in row.iter_mut().enumerate() {
+                let mut t = tile.get();
+                t.write((x*64) as u32, (y*64) as u32, &mut buffer);
             }
         }
 
@@ -258,8 +232,8 @@ impl Frame {
 
     pub fn raster<S, F, T, O>(&mut self, mut poly: S, fragment: F)
         where S: Iterator<Item=Triangle<T>>,
-              T: Clone + Interpolate<Out=O> + FetchPosition + Send + Sync,
-              F: Fragment<O, Color=Rgba<u8>> + Send + Sync {
+              T: Clone + Interpolate<Out=O> + FetchPosition + Send + Sync + 'static,
+              F: Fragment<O, Color=Rgba<u8>> + Send + Sync + 'static {
 
         use std::cmp::{min, max};
         let h = self.height;
@@ -267,87 +241,101 @@ impl Frame {
         let (hf, wf) = (h as f32, w as f32);
         let (hh, wh) = (hf/2., wf/2.);
 
-        let mut commands: Vec<Vec<Vec<(u64, Arc<TriangleGroup<T>>)>>> =
+        let mut commands: Vec<Vec<Vec<(Triangle<Vector4<f32>>, Triangle<T>)>>> =
             (0..(h / 64)).map( 
                 |_| (0..(w / 64)).map(
                     |_| Vec::new()
                 ).collect()
             ).collect();
 
-        loop {
-            let group = Arc::new(TriangleGroup::from_iter(&mut poly, hh, wh));
-            if group.0.len() == 0 {
-                break;
-            }
-
-            let mut apply: BTreeMap<(u32, u32), u64> = BTreeMap::new();
-
-            for (idx, &(ref clip4, _)) in group.0.iter().enumerate() {
-                let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
-
-                let max_x = clip.x.x.ceil().partial_max(clip.y.x.ceil().partial_max(clip.z.x.ceil()));
-                let min_x = clip.x.x.floor().partial_min(clip.y.x.floor().partial_min(clip.z.x.floor()));
-                let max_y = clip.x.y.ceil().partial_max(clip.y.y.ceil().partial_max(clip.z.y.ceil()));
-                let min_y = clip.x.y.floor().partial_min(clip.y.y.floor().partial_min(clip.z.y.floor()));
-
-                let min_x = (max(min_x as i32, 0) as u32) & (0xFFFFFFFF & !0x3F);
-                let min_y = (max(min_y as i32, 0) as u32) & (0xFFFFFFFF & !0x3F);
-                let max_x = min(max_x as u32, w);
-                let max_y = min(max_y as u32, h);
-                let max_x = if max_x & (64-1) != 0 { max_x + (64 - (max_x & (64-1))) } else { max_x };
-                let max_y = if max_y & (64-1) != 0 { max_y + (64 - (max_y & (64-1))) } else { max_y };
-
-                for y in range_step(min_y, max_y, 64) {
-                    for x in range_step(min_x, max_x, 64) {
-                        match apply.entry((y/64, x/64)) {
-                            Entry::Occupied(mut entry) => *entry.get_mut() |= 1 << idx as u64,
-                            Entry::Vacant(entry) => { entry.insert(1 << idx as u64); }
-                        }
-                    }
-                }
-            }
-
-            for ((y, x), mask) in apply.into_iter() {
-                commands[x as usize][y as usize].push((mask, group.clone()));
-            }
-
-            if group.0.len() < 64 {
-                break;
-            }
-        }
-
-
         let fragment = Arc::new(fragment);
-        {
-            let pool = ScopedPool::new(8);
-            for (x, (row, row_commands)) in self.tile.iter_mut().zip(commands.into_iter()).enumerate() {
-                for (y, (tile, tile_command)) in row.iter_mut().zip(row_commands.into_iter()).enumerate() {
-                    if tile_command.len() == 0 {
-                        continue;
-                    }
 
-                    let x = x as u32;
-                    let y = y as u32;
-                    let fragment = fragment.clone();
-                    pool.execute(move || {
-                        for (mut mask, group) in tile_command.into_iter() {
-                            while mask != 0 {
-                                let next = mask.trailing_zeros();
-                                mask &= !(1 << next);
+        for or in poly {
+            let t = or.clone().map_vertex(|v| {
+                let v = v.position();
+                Vector4::new(v[0], v[1], v[2], v[3])
+            });
 
-                                let (clip4, ref or) = group.0[next as usize];
+            let clip4 = t.map_vertex(|v| {
+                Vector4::new(
+                    wh * (v.x / v.w) + wh,
+                    -hh * (v.y / v.w) + hh,
+                    v.z / v.w,
+                    v.w / v.w
+                )
+            });
+
+
+            let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
+
+            let max_x = clip.x.x.ceil().partial_max(clip.y.x.ceil().partial_max(clip.z.x.ceil()));
+            let min_x = clip.x.x.floor().partial_min(clip.y.x.floor().partial_min(clip.z.x.floor()));
+            let max_y = clip.x.y.ceil().partial_max(clip.y.y.ceil().partial_max(clip.z.y.ceil()));
+            let min_y = clip.x.y.floor().partial_min(clip.y.y.floor().partial_min(clip.z.y.floor()));
+
+            let min_x = (max(min_x as i32, 0) as u32) & (0xFFFFFFFF & !0x3F);
+            let min_y = (max(min_y as i32, 0) as u32) & (0xFFFFFFFF & !0x3F);
+            let max_x = min(max_x as u32, w);
+            let max_y = min(max_y as u32, h);
+            let max_x = if max_x & (64-1) != 0 { max_x + (64 - (max_x & (64-1))) } else { max_x };
+            let max_y = if max_y & (64-1) != 0 { max_y + (64 - (max_y & (64-1))) } else { max_y };
+
+            for y in range_step(min_y, max_y, 64) {
+                for x in range_step(min_x, max_x, 64) {
+                    let ix = (x / 64) as usize;
+                    let iy = (y / 64) as usize;
+                    commands[ix][iy].push((clip4.clone(), or.clone()));
+
+                    if commands[ix][iy].len() >= 256 {
+                        let tile = &mut self.tile[ix][iy];
+                        let fragment = fragment.clone();
+                        let (tx, rx) = channel();
+                        let mut new = Future::from_receiver(rx);
+                        std::mem::swap(&mut new, tile);
+
+                        let mut tile_poly = Vec::new();
+                        std::mem::swap(&mut tile_poly, &mut commands[ix][iy]);
+                        self.pool.execute(move || {
+                            let mut t = new.get();
+                            for (clip4, ref or) in tile_poly.into_iter() {
                                 let clip3 = Vector3::new(clip4.x.z, clip4.y.z, clip4.z.z);
                                 let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
                                 let bary = Barycentric::new(clip);
-
-                                tile.raster(x*64, y*64, &clip3, &bary, or, &*fragment);
+                                t.raster(x, y, &clip3, &bary, or, &*fragment);
                             }
-                        }
-                    });
+                            tx.send(t);
+                        });
+                    }
                 }
             }
         }
 
+        for (x, (row, row_poly)) in self.tile.iter_mut().zip(commands.into_iter()).enumerate() {
+            for (y, (tile, tile_poly)) in row.iter_mut().zip(row_poly.into_iter()).enumerate() {
+                if tile_poly.len() == 0 {
+                    continue;
+                }
+
+                let x = x as u32;
+                let y = y as u32;
+
+                let fragment = fragment.clone();
+                let (tx, rx) = channel();
+                let mut new = Future::from_receiver(rx);
+                std::mem::swap(&mut new, tile);
+
+                self.pool.execute(move || {
+                    let mut t = new.get();
+                    for (clip4, ref or) in tile_poly.into_iter() {
+                        let clip3 = Vector3::new(clip4.x.z, clip4.y.z, clip4.z.z);
+                        let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
+                        let bary = Barycentric::new(clip);
+                        t.raster(x*64, y*64, &clip3, &bary, or, &*fragment);
+                    }
+                    tx.send(t);
+                });
+            }
+        }
     }
 
     /// draw grid line over the frame buffer. This is mostly a debug feature
@@ -359,7 +347,7 @@ impl Frame {
             if x < w && y < h {
                 let tx = (x / 64) as usize;
                 let ty = (y / 64) as usize;
-                self.tile[tx][ty].put(x % 64, y % 64, color);
+                self.tile[tx][ty].get().put(x % 64, y % 64, color);
             }
         };
 
@@ -375,6 +363,14 @@ impl Frame {
                 put(x-1, y);
                 put(x, y);
                 put(x+1, y);
+            }
+        }
+    }
+
+    pub fn flush(&mut self) {
+        for row in self.tile.iter_mut() {
+            for tile in row.iter_mut() {
+                tile.get();
             }
         }
     }

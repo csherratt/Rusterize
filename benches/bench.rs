@@ -40,6 +40,7 @@ fn plane_simple(bench: &mut Bencher) {
                          .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
             SetValue(Rgba([255, 255, 255, 255]))
         );
+        frame.flush();
     });
 }
 
@@ -49,11 +50,12 @@ fn plane_subdivide(bench: &mut Bencher) {
 
     bench.iter(|| {
         frame.clear();
-        let plane = generators::Plane::subdivide(128, 128);
+        let plane = generators::Plane::subdivide(64, 64);
         frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
             SetValue(Rgba([255, 255, 255, 255]))
         );
+        frame.flush();
     });
 }
 
@@ -68,6 +70,7 @@ fn plane_backface(bench: &mut Bencher) {
                           .vertex(|v| Vector4::new(-v.0, v.1, 0., 1.).into_fixed()),
             SetValue(Rgba([255, 255, 255, 255]))
         );
+        frame.flush();
     });
 }
 
@@ -86,6 +89,7 @@ fn plane_front_back(bench: &mut Bencher) {
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
             SetValue(Rgba([128, 128, 128, 255]))
         );
+        frame.flush();
     });
 }
 
@@ -104,6 +108,7 @@ fn plane_back_front(bench: &mut Bencher) {
                           .vertex(|v| Vector4::new(v.0, v.1, 1., 1.).into_fixed()),
             SetValue(Rgba([128, 128, 128, 255]))
         );
+        frame.flush();
     });
 }
 
@@ -111,7 +116,10 @@ fn plane_back_front(bench: &mut Bencher) {
 fn buffer_clear(bench: &mut Bencher) {
     let mut frame = Frame::new(SIZE, SIZE);
 
-    bench.iter(|| { frame.clear(); });
+    bench.iter(|| {
+        frame.clear();
+        frame.flush(); 
+    });
 }
 
 #[bench]
@@ -130,6 +138,7 @@ fn monkey(bench: &mut Bencher) {
 
         frame.clear();
         frame.raster(vertex, SetValue(Rgba([255, 255, 255, 255])));
+        frame.flush();
     });
 }
 

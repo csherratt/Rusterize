@@ -24,6 +24,10 @@ path = "examples/monkey.rs"
 name = "cull"
 path = "examples/cull.rs"
 
+[[example]]
+name = "powerplant"
+path = "examples/powerplant.rs"
+
 [dev-dependencies]
 obj="*"
 glfw="*"
@@ -31,3 +35,6 @@ time="*"
 rand="*"
 gfx="*"
 gfx_device_gl="*"
+
+[dev-dependencies.timeout_iter]
+git="https://github.com/csherratt/timeout_iter"
