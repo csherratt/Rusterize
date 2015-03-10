@@ -1,5 +1,3 @@
-#![feature(core, path)]
-
 extern crate gfx;
 extern crate gfx_device_gl;
 extern crate glfw;
@@ -17,10 +15,6 @@ use genmesh::*;
 use rusterize::{Frame, Fragment, Barycentric};
 use image::Rgba;
 use cgmath::*;
-use time::precise_time_s;
-use std::num::Float;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use rand::distributions::{IndependentSample, Range};
 
 const SIZE: u32 = 1024;
@@ -57,10 +51,6 @@ fn main() {
     let mut texture_frame = gfx::Frame::new(SIZE as u16, SIZE as u16);
     texture_frame.colors.push(gfx::Plane::Texture(texture.clone(), 0, None));
 
-    let mut show_grid = 0;
-    let mut raster_order = false;
-    let mut paused = false;
-
     let mut tri = Triangle::new(
         Vector2::new(-0.5, -0.5),
         Vector2::new( 0.5, -0.5),
@@ -76,18 +66,6 @@ fn main() {
             match event {
                 glfw::WindowEvent::Key(glfw::Key::Escape, _, glfw::Action::Press, _) =>
                     window.set_should_close(true),
-                glfw::WindowEvent::Key(glfw::Key::Num1, _, glfw::Action::Press, _) =>
-                    show_grid = if show_grid == 8 { 0 } else { 8 },
-                glfw::WindowEvent::Key(glfw::Key::Num2, _, glfw::Action::Press, _) =>
-                    show_grid = if show_grid == 16 { 0 } else { 16 },
-                glfw::WindowEvent::Key(glfw::Key::Num3, _, glfw::Action::Press, _) =>
-                    show_grid = if show_grid == 32 { 0 } else { 32 },
-                glfw::WindowEvent::Key(glfw::Key::Num4, _, glfw::Action::Press, _) =>
-                    show_grid = if show_grid == 64 { 0 } else { 64 },
-                glfw::WindowEvent::Key(glfw::Key::Num5, _, glfw::Action::Press, _) =>
-                    show_grid = if show_grid == 128 { 0 } else { 128 },
-                glfw::WindowEvent::Key(glfw::Key::Num6, _, glfw::Action::Press, _) =>
-                    show_grid = if show_grid == 256 { 0 } else { 256 },
                 glfw::WindowEvent::Key(glfw::Key::Space, _, glfw::Action::Press, _) => {
                     let between = Range::new(-1f32, 1.);
                     let mut rng = rand::thread_rng();
@@ -100,8 +78,6 @@ fn main() {
                     });
                     bary = Barycentric::new(tri);
                 }
-                glfw::WindowEvent::Key(glfw::Key::R, _, glfw::Action::Press, _) =>
-                    raster_order ^= true,
                 _ => {},
             }
         }
@@ -123,7 +99,7 @@ fn main() {
         impl Fragment<([f32; 4], [f32; 2])> for V {
             type Color = Rgba<u8>;
 
-            fn fragment(&self, (pos, screen) : ([f32; 4], [f32; 2])) -> Rgba<u8> {
+            fn fragment(&self, (_, screen) : ([f32; 4], [f32; 2])) -> Rgba<u8> {
                 let coord = self.bary.coordinate(Vector2::new(screen[0], screen[1]));
 
                 let x0 = screen[0] as u32 & !0x7;
@@ -159,12 +135,8 @@ fn main() {
             }
         }
 
-        let mut frame = Frame::new(SIZE, SIZE);
+        frame.clear();
         frame.raster(plane, V{bary: bary});
-
-        if show_grid != 0 {
-            frame.draw_grid(show_grid, Rgba([128, 128, 128, 255]));
-        }
         graphics.device.update_texture(&texture, &image_info, frame.to_image().as_slice()).unwrap();
 
         graphics.renderer.blit(&texture_frame,

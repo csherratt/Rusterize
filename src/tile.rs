@@ -165,13 +165,6 @@ impl TileGroup {
     pub fn clear(&mut self) {
         Raster::clear(&mut self.tiles);
     }
-
-    /*#[inline]
-    pub fn put(&mut self, x: u32, y: u32, value: Rgba<u8>) {
-        let gidx = TileIndex::from_xy(x / 8, y / 8);
-        let idx = TileIndex::from_xy(x & 0x7, y & 0x7);
-        self.tiles[gidx.0 as usize].put(idx, value);
-    }*/
 }
 
 trait Raster {

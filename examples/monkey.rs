@@ -1,5 +1,3 @@
-#![feature(core, path)]
-
 extern crate gfx;
 extern crate gfx_device_gl;
 extern crate glfw;
@@ -65,7 +63,6 @@ fn main() {
     let mut texture_frame = gfx::Frame::new(SIZE as u16, SIZE as u16);
     texture_frame.colors.push(gfx::Plane::Texture(texture.clone(), 0, None));
 
-    let mut show_grid = 0;
     let mut raster_order = false;
     let mut paused = false;
     let mut time = precise_time_s() as f32;
@@ -76,18 +73,6 @@ fn main() {
             match event {
                 glfw::WindowEvent::Key(glfw::Key::Escape, _, glfw::Action::Press, _) =>
                     window.set_should_close(true),
-                glfw::WindowEvent::Key(glfw::Key::Num1, _, glfw::Action::Press, _) =>
-                    show_grid = if show_grid == 8 { 0 } else { 8 },
-                glfw::WindowEvent::Key(glfw::Key::Num2, _, glfw::Action::Press, _) =>
-                    show_grid = if show_grid == 16 { 0 } else { 16 },
-                glfw::WindowEvent::Key(glfw::Key::Num3, _, glfw::Action::Press, _) =>
-                    show_grid = if show_grid == 32 { 0 } else { 32 },
-                glfw::WindowEvent::Key(glfw::Key::Num4, _, glfw::Action::Press, _) =>
-                    show_grid = if show_grid == 64 { 0 } else { 64 },
-                glfw::WindowEvent::Key(glfw::Key::Num5, _, glfw::Action::Press, _) =>
-                    show_grid = if show_grid == 128 { 0 } else { 128 },
-                glfw::WindowEvent::Key(glfw::Key::Num6, _, glfw::Action::Press, _) =>
-                    show_grid = if show_grid == 256 { 0 } else { 256 },
                 glfw::WindowEvent::Key(glfw::Key::Space, _, glfw::Action::Press, _) =>
                     paused ^= true,
                 glfw::WindowEvent::Key(glfw::Key::R, _, glfw::Action::Press, _) =>
@@ -158,9 +143,7 @@ fn main() {
                             .vertex(|(x, y)| [x, y, 0., 1.])
                             .triangulate(), RO{v: Arc::new(AtomicUsize::new(0))});
         }
-        if show_grid != 0 {
-            frame.draw_grid(show_grid, Rgba([128, 128, 128, 255]));
-        }
+
         graphics.device.update_texture(&texture, &image_info, frame.to_image().as_slice()).unwrap();
 
         graphics.renderer.blit(&texture_frame,

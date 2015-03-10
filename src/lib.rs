@@ -1,4 +1,4 @@
-#![feature(simd, unboxed_closures, core, collections)]
+#![feature(simd, unboxed_closures, core, std_misc)]
 #![allow(non_camel_case_types)]
 
 extern crate image;
@@ -6,13 +6,10 @@ extern crate genmesh;
 extern crate cgmath;
 extern crate threadpool;
 
-use std::num::{Float, Int};
+use std::num::Float;
 use std::sync::{Arc, Future};
 use std::sync::mpsc::channel;
 use std::iter::{range_step, range_step_inclusive};
-use std::collections::BTreeMap;
-use std::collections::btree_map::Entry;
-use std::fmt::Debug;
 
 use threadpool::ThreadPool;
 use image::{GenericImage, ImageBuffer, Rgba};
@@ -211,7 +208,7 @@ impl Frame {
                 self.pool.execute(move || {
                     let mut t = new.get();
                     t.clear();
-                    tx.send(t);
+                    tx.send(t).unwrap();
                 });
             }
         }
@@ -222,7 +219,7 @@ impl Frame {
 
         for (x, row) in self.tile.iter_mut().enumerate() {
             for (y, tile) in row.iter_mut().enumerate() {
-                let mut t = tile.get();
+                let t = tile.get();
                 t.write((x*64) as u32, (y*64) as u32, &mut buffer);
             }
         }
@@ -230,7 +227,7 @@ impl Frame {
         buffer
     }
 
-    pub fn raster<S, F, T, O>(&mut self, mut poly: S, fragment: F)
+    pub fn raster<S, F, T, O>(&mut self, poly: S, fragment: F)
         where S: Iterator<Item=Triangle<T>>,
               T: Clone + Interpolate<Out=O> + FetchPosition + Send + Sync + 'static,
               F: Fragment<O, Color=Rgba<u8>> + Send + Sync + 'static {
@@ -307,7 +304,7 @@ impl Frame {
                                 let bary = Barycentric::new(clip);
                                 t.raster(x, y, &clip3, &bary, or, &*fragment);
                             }
-                            tx.send(t);
+                            tx.send(t).unwrap();
                         });
                     }
                 }
@@ -336,37 +333,8 @@ impl Frame {
                         let bary = Barycentric::new(clip);
                         t.raster(x*64, y*64, &clip3, &bary, or, &*fragment);
                     }
-                    tx.send(t);
+                    tx.send(t).unwrap();
                 });
-            }
-        }
-    }
-
-    /// draw grid line over the frame buffer. This is mostly a debug feature
-    pub fn draw_grid(&mut self, spacing: u32, color: Rgba<u8>) {
-        let h = self.height;
-        let w = self.width;
-
-        let mut put = |x, y| {
-            if x < w && y < h {
-                let tx = (x / 64) as usize;
-                let ty = (y / 64) as usize;
-                //self.tile[tx][ty].get().put(x % 64, y % 64, color);
-            }
-        };
-
-        for x in range_step_inclusive(0, w, spacing) {
-            for y in range_step_inclusive(0, h, spacing) {
-                put(x, y-1);
-                put(x, y);
-                put(x, y+1);
-            }
-        }
-        for y in range_step_inclusive(0, h, spacing) {
-            for x in range_step_inclusive(0, w, spacing) {
-                put(x-1, y);
-                put(x, y);
-                put(x+1, y);
             }
         }
     }
