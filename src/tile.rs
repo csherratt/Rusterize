@@ -9,6 +9,7 @@ use genmesh::Triangle;
 use {Barycentric, Interpolate, Fragment};
 use f32x8::{f32x8x8, f32x8x8_vec3};
 
+
 #[derive(Copy, Debug)]
 pub struct TileMask {
     weights: f32x8x8_vec3,
@@ -115,26 +116,123 @@ impl Tile {
         }       
     }
 
-    pub fn read(x: u32, y: u32, v: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> Tile {
-        let mut color = [Rgba([0, 0, 0, 0]); 64];
-        for i in (0..64).map(|x| TileIndex(x)) {
-            color[i.0 as usize] = *v.get_pixel(x+i.x(), y+i.y()); 
+    #[inline]
+    pub fn put(&mut self, idx: TileIndex, value: Rgba<u8>) {
+        self.color[idx.0 as usize] = value;
+    }
+}
+
+#[derive(Copy)]
+struct Quad<T>(pub [T; 4]);
+
+impl<T: Copy> Quad<T> {
+    pub fn new(t: T) -> Quad<T> {
+        Quad([t, t, t, t])
+    }
+}
+
+#[derive(Copy)]
+pub struct TileGroup {
+    tiles: Quad<Quad<Quad<Tile>>>
+}
+
+impl Clone for TileGroup {
+    fn clone(&self) -> TileGroup {
+        TileGroup {
+            tiles: self.tiles
         }
-        Tile {
-            depth: f32x8x8::broadcast(1.),
-            color: color
+    }
+}
+
+impl TileGroup {
+    pub fn new() -> TileGroup {
+        TileGroup {
+            tiles: Quad::new(Quad::new(Quad::new(Tile::new())))
         }
     }
 
-    #[inline]
     pub fn write(&self, x: u32, y: u32, v: &mut ImageBuffer<Rgba<u8>, Vec<u8>>) {
-        for i in (0..64).map(|x| TileIndex(x)) {
-            v.put_pixel(x+i.x(), y+i.y(), self.color[i.0 as usize]);
+        self.tiles.write(x, y, v);
+    }
+
+    pub fn raster<F, T, O>(&mut self, x: u32, y: u32, z: &Vector3<f32>, bary: &Barycentric, t: &Triangle<T>, fragment: &F) where
+              T: Interpolate<Out=O>,
+              F: Fragment<O, Color=Rgba<u8>> {
+
+        self.tiles.raster(x, y, z, bary, t, fragment);
+    }
+
+    pub fn clear(&mut self) {
+        Raster::clear(&mut self.tiles);
+    }
+
+    /*#[inline]
+    pub fn put(&mut self, x: u32, y: u32, value: Rgba<u8>) {
+        let gidx = TileIndex::from_xy(x / 8, y / 8);
+        let idx = TileIndex::from_xy(x & 0x7, y & 0x7);
+        self.tiles[gidx.0 as usize].put(idx, value);
+    }*/
+}
+
+trait Raster {
+    fn size(&self) -> u32;
+    fn raster<F, T, O>(&mut self, x: u32, y: u32, z: &Vector3<f32>, bary: &Barycentric, t: &Triangle<T>, fragment: &F) where
+              T: Interpolate<Out=O>,
+              F: Fragment<O, Color=Rgba<u8>>;
+
+    fn clear(&mut self);
+    fn write(&self, x: u32, y: u32, v: &mut ImageBuffer<Rgba<u8>, Vec<u8>>);
+}
+
+impl<I> Raster for Quad<I> where I: Raster {
+    #[inline(always)]
+    fn size(&self) -> u32 { 2 * self.0[0].size() }
+
+    #[inline]
+    fn raster<F, T, O>(&mut self,
+                       x: u32,
+                       y: u32,
+                       z: &Vector3<f32>,
+                       bary: &Barycentric,
+                       t: &Triangle<T>,
+                       fragment: &F) where
+              T: Interpolate<Out=O>,
+              F: Fragment<O, Color=Rgba<u8>> {
+
+        let off = Vector2::new(x as f32, y as f32);
+        let size = (self.size() - 1) as f32;
+        if bary.tile_fast_check(off, Vector2::new(size, size)) {
+            return;
+        }
+
+        let tsize = self.0[0].size();
+        self.0[0].raster(x,       y,       z, bary, t, fragment);
+        self.0[1].raster(x+tsize, y,       z, bary, t, fragment);
+        self.0[2].raster(x,       y+tsize, z, bary, t, fragment);
+        self.0[3].raster(x+tsize, y+tsize, z, bary, t, fragment);
+    }
+
+    fn clear(&mut self) {
+        for i in self.0.iter_mut() {
+            i.clear()
         }
     }
 
+    fn write(&self, x: u32, y: u32, v: &mut ImageBuffer<Rgba<u8>, Vec<u8>>) {
+        let tsize = self.0[0].size();
+        self.0[0].write(x,       y,       v);
+        self.0[1].write(x+tsize, y,       v);
+        self.0[2].write(x,       y+tsize, v);
+        self.0[3].write(x+tsize, y+tsize, v);
+    }
+}
+
+impl Raster for Tile {
+    #[inline(always)]
+    fn size(&self) -> u32 { 8 }
+
     #[inline]
-    pub fn raster<F, T, O>(&mut self, x: u32, y: u32, z: &Vector3<f32>, bary: &Barycentric, t: &Triangle<T>, fragment: &F) where
+    fn raster<F, T, O>(&mut self, x: u32, y: u32, z: &Vector3<f32>, bary: &Barycentric, t: &Triangle<T>, fragment: &F) where
               T: Interpolate<Out=O>,
               F: Fragment<O, Color=Rgba<u8>> {
 
@@ -153,88 +251,15 @@ impl Tile {
     }
 
     #[inline]
-    pub fn clear(&mut self) {
+    fn write(&self, x: u32, y: u32, v: &mut ImageBuffer<Rgba<u8>, Vec<u8>>) {
+        for i in (0..64).map(|x| TileIndex(x)) {
+            v.put_pixel(x+i.x(), y+i.y(), self.color[i.0 as usize]);
+        }
+    }
+
+    #[inline]
+    fn clear(&mut self) {
         self.depth = f32x8x8::broadcast(1.);
         self.color = [Rgba([0, 0, 0, 0]); 64];
-    }
-
-    #[inline]
-    pub fn put(&mut self, idx: TileIndex, value: Rgba<u8>) {
-        self.color[idx.0 as usize] = value;
-    }
-}
-
-#[derive(Copy)]
-pub struct TileGroup {
-    tiles: [Tile; 64],
-    x: u32,
-    y: u32
-}
-
-impl Clone for TileGroup {
-    fn clone(&self) -> TileGroup {
-        TileGroup {
-            tiles: self.tiles,
-            x: self.x,
-            y: self.y
-        }
-    }
-}
-
-impl TileGroup {
-    pub fn new() -> TileGroup {
-        TileGroup {
-            tiles: [Tile::new(); 64],
-            x: 0,
-            y: 0
-        }
-    }
-
-    pub fn read(x: u32, y: u32, v: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> TileGroup {
-        let mut tiles = [Tile::new(); 64];
-        for (i, tile) in tiles.iter_mut().enumerate() {
-            let i = TileIndex(i as u32);
-            *tile = Tile::read(x + i.x8(), y + i.y8(), v);
-        }
-        TileGroup {
-            tiles: tiles,
-            x: x,
-            y: y
-        }
-    }
-
-    pub fn write(&self, x: u32, y: u32, v: &mut ImageBuffer<Rgba<u8>, Vec<u8>>) {
-        for (i, tile) in self.tiles.iter().enumerate() {
-            let i = TileIndex(i as u32);
-            tile.write(x + i.x8(), y + i.y8(), v);
-        }
-    }
-
-    pub fn raster<F, T, O>(&mut self, x: u32, y: u32, z: &Vector3<f32>, bary: &Barycentric, t: &Triangle<T>, fragment: &F) where
-              T: Interpolate<Out=O>,
-              F: Fragment<O, Color=Rgba<u8>> {
-
-        let off = Vector2::new(x as f32, y as f32);
-        if bary.tile_fast_check(off, Vector2::new(63., 63.)) {
-            return;
-        }
-
-        for (i, tile) in self.tiles.iter_mut().enumerate() {
-            let i = TileIndex(i as u32);
-            tile.raster(x + i.x8(), y + i.y8(), z, bary, t, fragment);
-        }
-    }
-
-    pub fn clear(&mut self) {
-        for tile in self.tiles.iter_mut() {
-            tile.clear()
-        }
-    }
-
-    #[inline]
-    pub fn put(&mut self, x: u32, y: u32, value: Rgba<u8>) {
-        let gidx = TileIndex::from_xy(x / 8, y / 8);
-        let idx = TileIndex::from_xy(x & 0x7, y & 0x7);
-        self.tiles[gidx.0 as usize].put(idx, value);
     }
 }

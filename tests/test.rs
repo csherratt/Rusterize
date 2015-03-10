@@ -15,7 +15,7 @@ use image::Rgba;
 
 const SIZE: u32 = 64;
 
-fn check(name: &str, frame: Frame) {
+fn check(name: &str, mut frame: Frame) {
     let frame = frame.to_image();
 
     // Save the image output just incase the test fails

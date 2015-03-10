@@ -46,13 +46,18 @@ fn plane_simple(bench: &mut Bencher) {
 
 #[bench]
 fn plane_subdivide(bench: &mut Bencher) {
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(256, 256);
+
+    let plane: Vec<Triangle<[f32; 4]>> =
+        generators::Plane::subdivide(SIZE as usize, SIZE as usize)
+            .triangulate()
+            .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed())
+            .collect();
+
 
     bench.iter(|| {
         frame.clear();
-        let plane = generators::Plane::subdivide(64, 64);
-        frame.raster(plane.triangulate()
-                          .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
+        frame.raster(plane.iter().map(|x| *x),
             SetValue(Rgba([255, 255, 255, 255]))
         );
         frame.flush();

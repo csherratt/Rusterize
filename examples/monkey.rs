@@ -13,7 +13,7 @@ extern crate time;
 use gfx::traits::*;
 use glfw::Context;
 use genmesh::{Triangulate, MapToVertices};
-use genmesh::generators::Cube;
+use genmesh::generators;
 use rusterize::{Frame, Fragment};
 use image::Rgba;
 use cgmath::*;
@@ -140,13 +140,13 @@ fn main() {
             v: Arc<AtomicUsize>
         }
 
-        impl Fragment<([f32; 4], [f32; 3])> for RO {
+        impl Fragment<[f32; 4]> for RO {
             type Color = Rgba<u8>;
 
             #[inline]
-            fn fragment(&self, (_, n) : ([f32; 4], [f32; 3])) -> Rgba<u8> {
+            fn fragment(&self, _ : [f32; 4]) -> Rgba<u8> {
                 let x = self.v.fetch_add(1, Ordering::SeqCst);
-                Rgba([(x >> 5) as u8, (x >> 9) as u8, (x >> 12) as u8, 255])
+                Rgba([(x >> 6) as u8, (x >> 12) as u8, (x >> 18) as u8, 255])
             }
         }
 
@@ -154,7 +154,9 @@ fn main() {
         if !raster_order {
             frame.raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
         } else {
-            frame.raster(vertex, RO{v: Arc::new(AtomicUsize::new(0))});
+            frame.raster(generators::Plane::new()
+                            .vertex(|(x, y)| [x, y, 0., 1.])
+                            .triangulate(), RO{v: Arc::new(AtomicUsize::new(0))});
         }
         if show_grid != 0 {
             frame.draw_grid(show_grid, Rgba([128, 128, 128, 255]));

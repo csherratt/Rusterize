@@ -265,6 +265,10 @@ impl Frame {
                 )
             });
 
+            if !is_backface(clip4.map_vertex(|v| Vector3::new(v.x, v.y, v.z))) {
+                continue;
+            }
+
 
             let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
 
@@ -347,7 +351,7 @@ impl Frame {
             if x < w && y < h {
                 let tx = (x / 64) as usize;
                 let ty = (y / 64) as usize;
-                self.tile[tx][ty].get().put(x % 64, y % 64, color);
+                //self.tile[tx][ty].get().put(x % 64, y % 64, color);
             }
         };
 
