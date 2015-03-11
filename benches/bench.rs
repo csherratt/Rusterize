@@ -7,7 +7,9 @@ extern crate rusterize;
 extern crate test;
 extern crate obj;
 
-use rusterize::{Frame, Fragment};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use rusterize::{Frame, Fragment, TileGroup, Tile, Raster};
 use cgmath::*;
 use genmesh::*;
 use test::{Bencher, black_box};
@@ -46,10 +48,10 @@ fn plane_simple(bench: &mut Bencher) {
 
 #[bench]
 fn plane_subdivide(bench: &mut Bencher) {
-    let mut frame = Frame::new(256, 256);
+    let mut frame = Frame::new(64, 64);
 
     let plane: Vec<Triangle<[f32; 4]>> =
-        generators::Plane::subdivide(SIZE as usize, SIZE as usize)
+        generators::Plane::subdivide(64 as usize, 64 as usize)
             .triangulate()
             .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed())
             .collect();
@@ -303,4 +305,148 @@ fn tile_fast_check(bench: &mut Bencher) {
         x += 1.;
         y += 1.;
     });
+}
+
+#[bench]
+fn tile_group_all(bench: &mut Bencher) {
+    use rusterize::Barycentric;
+
+    let tri = Triangle::new(Vector4::new(0.,   0.,   0., 0.),
+                            Vector4::new(256., 0.,   0., 0.),
+                            Vector4::new(0.,   256., 0., 0.));
+
+    let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
+    let tri = tri.map_vertex(|t| t.into_fixed());
+
+    let mut group = TileGroup::new();
+    bench.iter(|| {
+        group.raster(
+            0, 0,
+            &Vector3::new(0., 0., 0.),
+            &bary,
+            &tri,
+            &SetValue(Rgba([255, 255, 255, 255]))
+        );
+    });
+    black_box(group);
+}
+
+#[bench]
+fn tile_group_one(bench: &mut Bencher) {
+    use rusterize::Barycentric;
+
+    let tri = Triangle::new(Vector4::new(0.,  0.,  0., 0.),
+                            Vector4::new(0.5, 0.5, 0., 0.),
+                            Vector4::new(0.,  0.5, 0., 0.));
+
+    let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
+    let tri = tri.map_vertex(|t| t.into_fixed());
+
+    let mut group = TileGroup::new();
+    bench.iter(|| {
+        group.raster(
+            0, 0,
+            &Vector3::new(0., 0., 0.),
+            &bary,
+            &tri,
+            &SetValue(Rgba([255, 255, 255, 255]))
+        );
+    });
+    black_box(group);
+}
+
+#[bench]
+fn tile_group_zero(bench: &mut Bencher) {
+    use rusterize::Barycentric;
+
+    let tri = Triangle::new(Vector4::new(0., 0., 0., 0.),
+                            Vector4::new(0.1, 0.1, 0., 0.),
+                            Vector4::new(0., 0.1, 0., 0.));
+
+    let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
+    let tri = tri.map_vertex(|t| t.into_fixed());
+
+    let mut group = TileGroup::new();
+    bench.iter(|| {
+        group.raster(
+            0, 0,
+            &Vector3::new(0., 0., 0.),
+            &bary,
+            &tri,
+            &SetValue(Rgba([255, 255, 255, 255]))
+        );
+    });
+    black_box(group);
+}
+
+#[bench]
+fn tile_all(bench: &mut Bencher) {
+    use rusterize::Barycentric;
+
+    let tri = Triangle::new(Vector4::new(0.,   0.,   0., 0.),
+                            Vector4::new(256., 0.,   0., 0.),
+                            Vector4::new(0.,   256., 0., 0.));
+
+    let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
+    let tri = tri.map_vertex(|t| t.into_fixed());
+
+    let mut tile = Tile::new();
+    bench.iter(|| {
+        tile.raster(
+            0, 0,
+            &Vector3::new(0., 0., 0.),
+            &bary,
+            &tri,
+            &SetValue(Rgba([255, 255, 255, 255]))
+        );
+    });
+    black_box(tile);
+}
+
+#[bench]
+fn tile_one(bench: &mut Bencher) {
+    use rusterize::Barycentric;
+
+    let tri = Triangle::new(Vector4::new(0.,  0.,  0., 0.),
+                            Vector4::new(0.5, 0.5, 0., 0.),
+                            Vector4::new(0.,  0.5, 0., 0.));
+
+    let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
+    let tri = tri.map_vertex(|t| t.into_fixed());
+
+    let mut tile = Tile::new();
+    bench.iter(|| {
+        tile.raster(
+            0, 0,
+            &Vector3::new(0., 0., 0.),
+            &bary,
+            &tri,
+            &SetValue(Rgba([255, 255, 255, 255]))
+        );
+    });
+    black_box(tile);
+}
+
+#[bench]
+fn tile_zero(bench: &mut Bencher) {
+    use rusterize::Barycentric;
+
+    let tri = Triangle::new(Vector4::new(0., 0., 0., 0.),
+                            Vector4::new(0.1, 0.1, 0., 0.),
+                            Vector4::new(0., 0.1, 0., 0.));
+
+    let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
+    let tri = tri.map_vertex(|t| t.into_fixed());
+
+    let mut tile = Tile::new();
+    bench.iter(|| {
+        tile.raster(
+            0, 0,
+            &Vector3::new(0., 0., 0.),
+            &bary,
+            &tri,
+            &SetValue(Rgba([255, 255, 255, 255]))
+        );
+    });
+    black_box(tile);
 }

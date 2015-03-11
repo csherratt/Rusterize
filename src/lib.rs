@@ -1,4 +1,4 @@
-#![feature(simd, unboxed_closures, core, std_misc)]
+#![feature(simd, unboxed_closures, core, std_misc, os)]
 #![allow(non_camel_case_types)]
 
 extern crate image;
@@ -9,14 +9,14 @@ extern crate threadpool;
 use std::num::Float;
 use std::sync::{Arc, Future};
 use std::sync::mpsc::channel;
-use std::iter::{range_step, range_step_inclusive};
+use std::iter::range_step;
 
 use threadpool::ThreadPool;
 use image::{GenericImage, ImageBuffer, Rgba};
 use cgmath::*;
 use genmesh::{Triangle, MapVertex};
 
-use tile::TileGroup;
+pub use tile::{TileGroup, Tile, Raster};
 use vmath::Dot;
 use f32x8::f32x8x8;
 pub use pipeline::{Fragment, Vertex};
@@ -194,7 +194,7 @@ impl Frame {
                     |_| Future::from_value(Box::new(TileGroup::new()))
                 ).collect()
             ).collect(),
-            pool: ThreadPool::new(16)
+            pool: ThreadPool::new(std::os::num_cpus())
         }
     }
 
@@ -287,7 +287,7 @@ impl Frame {
                     let iy = (y / 64) as usize;
                     commands[ix][iy].push((clip4.clone(), or.clone()));
 
-                    if commands[ix][iy].len() >= 256 {
+                    if commands[ix][iy].len() >= 64 {
                         let tile = &mut self.tile[ix][iy];
                         let fragment = fragment.clone();
                         let (tx, rx) = channel();

@@ -12,7 +12,8 @@ use f32x8::{f32x8x8, f32x8x8_vec3};
 
 #[derive(Copy, Debug)]
 pub struct TileMask {
-    weights: f32x8x8_vec3,
+    u: f32x8x8,
+    v: f32x8x8,
     mask: u64
 }
 
@@ -22,14 +23,14 @@ impl TileMask {
     pub fn new(pos: Vector2<f32>, bary: &Barycentric) -> TileMask {
         let [u, v] =  bary.coordinate_f32x8x8(pos, Vector2::new(1., 1.));
         let uv = f32x8x8::broadcast(1.) - (u + v);
-        let weights = f32x8x8_vec3([uv, u, v]);
 
-        let mask = !(weights.0[0].to_bit_u32x8x8().bitmask() |
-                     weights.0[1].to_bit_u32x8x8().bitmask() |
-                     weights.0[2].to_bit_u32x8x8().bitmask());
+        let mask = !(uv.to_bit_u32x8x8().bitmask() |
+                      u.to_bit_u32x8x8().bitmask() |
+                      v.to_bit_u32x8x8().bitmask());
 
         TileMask {
-            weights: weights,
+            u: u,
+            v: v,
             mask: mask
         }
     }
@@ -37,7 +38,10 @@ impl TileMask {
     #[inline]
     pub fn mask_with_depth(&mut self, z: &Vector3<f32>, d: &mut f32x8x8) {
         let z = f32x8x8_vec3::broadcast(Vector3::new(z.x, z.y, z.z));
-        let depth = self.weights.dot(z);
+        let uv = f32x8x8::broadcast(1.) - (self.u + self.v);
+        let weights = f32x8x8_vec3([uv, self.u, self.v]);
+        let depth = weights.dot(z);
+
         self.mask &= (depth - *d).to_bit_u32x8x8().bitmask();
         d.replace(depth, self.mask);
     }
@@ -45,7 +49,8 @@ impl TileMask {
     #[inline]
     pub fn iter(self) -> TileMaskIter {
         TileMaskIter {
-            weights: unsafe { mem::transmute(self.weights) },
+            u: unsafe { mem::transmute(self.u) },
+            v: unsafe { mem::transmute(self.v) },
             mask: self.mask
         }
     }
@@ -66,7 +71,8 @@ impl TileIndex {
 }
 
 pub struct TileMaskIter {
-    weights: [[f32; 64]; 3],
+    u: [f32; 64],
+    v: [f32; 64],
     mask: u64
 }
 
@@ -81,12 +87,13 @@ impl Iterator for TileMaskIter {
 
         let next = self.mask.trailing_zeros();
         self.mask &= !(1 << next);
+
         unsafe {
+            let u = self.u.get_unchecked(next as usize);
+            let v = self.v.get_unchecked(next as usize);
             Some((
                 TileIndex(next as u32),
-                [*self.weights[0].get_unchecked(next as usize),
-                 *self.weights[1].get_unchecked(next as usize),
-                 *self.weights[2].get_unchecked(next as usize)]
+                [1. - (u + v), *u, *v]
 
             ))
         }
@@ -167,7 +174,7 @@ impl TileGroup {
     }
 }
 
-trait Raster {
+pub trait Raster {
     fn size(&self) -> u32;
     fn raster<F, T, O>(&mut self, x: u32, y: u32, z: &Vector3<f32>, bary: &Barycentric, t: &Triangle<T>, fragment: &F) where
               T: Interpolate<Out=O>,
@@ -178,7 +185,7 @@ trait Raster {
 }
 
 impl<I> Raster for Quad<I> where I: Raster {
-    #[inline(always)]
+    #[inline]
     fn size(&self) -> u32 { 2 * self.0[0].size() }
 
     #[inline]
@@ -221,7 +228,7 @@ impl<I> Raster for Quad<I> where I: Raster {
 }
 
 impl Raster for Tile {
-    #[inline(always)]
+    #[inline]
     fn size(&self) -> u32 { 8 }
 
     #[inline]

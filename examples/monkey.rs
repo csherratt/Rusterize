@@ -12,7 +12,7 @@ use gfx::traits::*;
 use glfw::Context;
 use genmesh::{Triangulate, MapToVertices};
 use genmesh::generators;
-use rusterize::{Frame, Fragment};
+use rusterize::{Frame, Fragment, Raster};
 use image::Rgba;
 use cgmath::*;
 use time::precise_time_s;
@@ -81,9 +81,10 @@ fn main() {
             }
         }
 
-        if !paused {
-            time = precise_time_s() as f32;
+        if paused {
+            continue;
         }
+        time = precise_time_s() as f32;
         let cam_pos = {
             // Slowly circle the center
             let x = (0.25*time).sin();
@@ -131,7 +132,7 @@ fn main() {
             #[inline]
             fn fragment(&self, _ : [f32; 4]) -> Rgba<u8> {
                 let x = self.v.fetch_add(1, Ordering::SeqCst);
-                Rgba([(x >> 6) as u8, (x >> 12) as u8, (x >> 18) as u8, 255])
+                Rgba([0, (x >> 12) as u8, (x >> 18) as u8, 255])
             }
         }
 
@@ -139,9 +140,7 @@ fn main() {
         if !raster_order {
             frame.raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
         } else {
-            frame.raster(generators::Plane::new()
-                            .vertex(|(x, y)| [x, y, 0., 1.])
-                            .triangulate(), RO{v: Arc::new(AtomicUsize::new(0))});
+            frame.raster(vertex.vertex(|(p, n)| { p }), RO{v: Arc::new(AtomicUsize::new(0))});
         }
 
         graphics.device.update_texture(&texture, &image_info, frame.to_image().as_slice()).unwrap();
