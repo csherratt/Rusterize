@@ -9,7 +9,7 @@ extern crate threadpool;
 use std::num::Float;
 use std::sync::{Arc, Future};
 use std::sync::mpsc::channel;
-use std::iter::range_step;
+use std::iter::{range_step, range_step_inclusive};
 
 use threadpool::ThreadPool;
 use image::{GenericImage, ImageBuffer, Rgba};
@@ -189,8 +189,8 @@ impl Frame {
         Frame {
             width: width,
             height: height,
-            tile: (0..(height / 64)).map(
-                |_| (0..(width / 64)).map(
+            tile: (0..(height / 32)).map(
+                |_| (0..(width / 32)).map(
                     |_| Future::from_value(Box::new(TileGroup::new()))
                 ).collect()
             ).collect(),
@@ -220,7 +220,7 @@ impl Frame {
         for (x, row) in self.tile.iter_mut().enumerate() {
             for (y, tile) in row.iter_mut().enumerate() {
                 let t = tile.get();
-                t.write((x*64) as u32, (y*64) as u32, &mut buffer);
+                t.write((x*32) as u32, (y*32) as u32, &mut buffer);
             }
         }
 
@@ -239,8 +239,8 @@ impl Frame {
         let (hh, wh) = (hf/2., wf/2.);
 
         let mut commands: Vec<Vec<Vec<(Triangle<Vector4<f32>>, Triangle<T>)>>> =
-            (0..(h / 64)).map( 
-                |_| (0..(w / 64)).map(
+            (0..(h / 32)).map( 
+                |_| (0..(w / 32)).map(
                     |_| Vec::new()
                 ).collect()
             ).collect();
@@ -274,20 +274,18 @@ impl Frame {
             let max_y = clip.x.y.ceil().partial_max(clip.y.y.ceil().partial_max(clip.z.y.ceil()));
             let min_y = clip.x.y.floor().partial_min(clip.y.y.floor().partial_min(clip.z.y.floor()));
 
-            let min_x = (max(min_x as i32, 0) as u32) & (0xFFFFFFFF & !0x3F);
-            let min_y = (max(min_y as i32, 0) as u32) & (0xFFFFFFFF & !0x3F);
-            let max_x = min(max_x as u32, w);
-            let max_y = min(max_y as u32, h);
-            let max_x = if max_x & (64-1) != 0 { max_x + (64 - (max_x & (64-1))) } else { max_x };
-            let max_y = if max_y & (64-1) != 0 { max_y + (64 - (max_y & (64-1))) } else { max_y };
+            let min_x = (max(min_x as i32, 0) as u32) & (0xFFFFFFFF & !0x1F);
+            let min_y = (max(min_y as i32, 0) as u32) & (0xFFFFFFFF & !0x1F);
+            let max_x = min(max_x as u32, w-0x1F);
+            let max_y = min(max_y as u32, h-0x1F);
 
-            for y in range_step(min_y, max_y, 64) {
-                for x in range_step(min_x, max_x, 64) {
-                    let ix = (x / 64) as usize;
-                    let iy = (y / 64) as usize;
+            for y in range_step_inclusive(min_y, max_y, 32) {
+                for x in range_step_inclusive(min_x, max_x, 32) {
+                    let ix = (x / 32) as usize;
+                    let iy = (y / 32) as usize;
                     commands[ix][iy].push((clip4.clone(), or.clone()));
 
-                    if commands[ix][iy].len() >= 64 {
+                    if commands[ix][iy].len() >= 256 {
                         let tile = &mut self.tile[ix][iy];
                         let fragment = fragment.clone();
                         let (tx, rx) = channel();
@@ -331,7 +329,7 @@ impl Frame {
                         let clip3 = Vector3::new(clip4.x.z, clip4.y.z, clip4.z.z);
                         let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
                         let bary = Barycentric::new(clip);
-                        t.raster(x*64, y*64, &clip3, &bary, or, &*fragment);
+                        t.raster(x*32, y*32, &clip3, &bary, or, &*fragment);
                     }
                     tx.send(t).unwrap();
                 });

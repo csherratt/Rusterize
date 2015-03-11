@@ -140,7 +140,7 @@ impl<T: Copy> Quad<T> {
 
 #[derive(Copy)]
 pub struct TileGroup {
-    tiles: Quad<Quad<Quad<Tile>>>
+    tiles: Quad<Quad<Tile>>
 }
 
 impl Clone for TileGroup {
@@ -154,7 +154,7 @@ impl Clone for TileGroup {
 impl TileGroup {
     pub fn new() -> TileGroup {
         TileGroup {
-            tiles: Quad::new(Quad::new(Quad::new(Tile::new())))
+            tiles: Quad::new(Quad::new(Tile::new()))
         }
     }
 
@@ -175,6 +175,7 @@ impl TileGroup {
 }
 
 pub trait Raster {
+    fn mask(&self) -> u32 { 0xFFFF_FFFF - (self.size() - 1) }
     fn size(&self) -> u32;
     fn raster<F, T, O>(&mut self, x: u32, y: u32, z: &Vector3<f32>, bary: &Barycentric, t: &Triangle<T>, fragment: &F) where
               T: Interpolate<Out=O>,
@@ -212,12 +213,14 @@ impl<I> Raster for Quad<I> where I: Raster {
         self.0[3].raster(x+tsize, y+tsize, z, bary, t, fragment);
     }
 
+    #[inline]
     fn clear(&mut self) {
         for i in self.0.iter_mut() {
             i.clear()
         }
     }
 
+    #[inline]
     fn write(&self, x: u32, y: u32, v: &mut ImageBuffer<Rgba<u8>, Vec<u8>>) {
         let tsize = self.0[0].size();
         self.0[0].write(x,       y,       v);
