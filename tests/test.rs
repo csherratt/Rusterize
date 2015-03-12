@@ -51,6 +51,29 @@ fn plane_simple() {
 }
 
 #[test]
+fn plane_clip_far() {
+    let mut frame = Frame::new(SIZE, SIZE);
+    let cube = generators::Plane::new()
+        .triangulate()
+        .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 100., 2.).mul_s(0.5)).into_fixed());
+
+    frame.raster(cube, SetValue(Rgba([255, 255, 255, 255])));
+    check("plane_far", frame);
+}
+
+
+#[test]
+fn plane_clip_near() {
+    let mut frame = Frame::new(SIZE, SIZE);
+    let cube = generators::Plane::new()
+        .triangulate()
+        .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, -100., 2.).mul_s(0.5)).into_fixed());
+
+    frame.raster(cube, SetValue(Rgba([255, 255, 255, 255])));
+    check("plane_near", frame);
+}
+
+#[test]
 fn plane_backface() {
     let mut frame = Frame::new(SIZE, SIZE);
     let cube = generators::Plane::new()

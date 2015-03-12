@@ -9,7 +9,7 @@ extern crate threadpool;
 use std::num::Float;
 use std::sync::{Arc, Future};
 use std::sync::mpsc::channel;
-use std::iter::{range_step, range_step_inclusive};
+use std::iter::range_step_inclusive;
 
 use threadpool::ThreadPool;
 use image::{GenericImage, ImageBuffer, Rgba};
@@ -285,14 +285,14 @@ impl Frame {
                     let iy = (y / 32) as usize;
                     commands[ix][iy].push((clip4.clone(), or.clone()));
 
-                    if commands[ix][iy].len() >= 256 {
+                    if commands[ix][iy].len() == commands[ix][iy].capacity() {
                         let tile = &mut self.tile[ix][iy];
                         let fragment = fragment.clone();
                         let (tx, rx) = channel();
                         let mut new = Future::from_receiver(rx);
                         std::mem::swap(&mut new, tile);
 
-                        let mut tile_poly = Vec::new();
+                        let mut tile_poly = Vec::with_capacity(256);
                         std::mem::swap(&mut tile_poly, &mut commands[ix][iy]);
                         self.pool.execute(move || {
                             let mut t = new.get();
