@@ -10,6 +10,7 @@ use std::num::Float;
 use std::sync::{Arc, Future};
 use std::sync::mpsc::channel;
 use std::iter::range_step_inclusive;
+use std::fmt::Debug;
 
 use threadpool::ThreadPool;
 use image::{GenericImage, ImageBuffer, Rgba};
@@ -133,11 +134,10 @@ impl Barycentric {
     }
 
     #[inline]
-    pub fn coordinate_f32x8x8(&self, p: Vector2<f32>, s: Vector2<f32>) -> [f32x8::f32x8x8; 2] {
+    pub fn coordinate_f32x8x8(&self, x: u32, y: u32) -> [f32x8::f32x8x8; 2] {
         use f32x8::{f32x8x8, f32x8x8_vec2};
-        let v2 = p - self.base;
 
-        let v2 = f32x8x8_vec2::range(v2.x, v2.y, s.x, s.y);
+        let v2 = f32x8x8_vec2::range(x, y) - f32x8x8_vec2::broadcast(self.base);
 
         let d00 = self.v0.dot(self.v0);
         let d01 = self.v0.dot(self.v1);
@@ -189,8 +189,8 @@ impl Frame {
         Frame {
             width: width,
             height: height,
-            tile: (0..(height / 32)).map(
-                |_| (0..(width / 32)).map(
+            tile: (0..(height / 32_)).map(
+                |_| (0..(width / 32_)).map(
                     |_| Future::from_value(Box::new(TileGroup::new()))
                 ).collect()
             ).collect(),
@@ -220,7 +220,7 @@ impl Frame {
         for (x, row) in self.tile.iter_mut().enumerate() {
             for (y, tile) in row.iter_mut().enumerate() {
                 let t = tile.get();
-                t.write((x*32) as u32, (y*32) as u32, &mut buffer);
+                t.write((x*32_) as u32, (y*32_) as u32, &mut buffer);
             }
         }
 
@@ -229,7 +229,7 @@ impl Frame {
 
     pub fn raster<S, F, T, O>(&mut self, poly: S, fragment: F)
         where S: Iterator<Item=Triangle<T>>,
-              T: Clone + Interpolate<Out=O> + FetchPosition + Send + Sync + 'static,
+              T: Clone + Interpolate<Out=O> + FetchPosition + Send + Sync + 'static + Debug,
               F: Fragment<O, Color=Rgba<u8>> + Send + Sync + 'static {
 
         use std::cmp::{min, max};
@@ -239,9 +239,9 @@ impl Frame {
         let (hh, wh) = (hf/2., wf/2.);
 
         let mut commands: Vec<Vec<Vec<(Triangle<Vector4<f32>>, Triangle<T>)>>> =
-            (0..(h / 32)).map( 
-                |_| (0..(w / 32)).map(
-                    |_| Vec::new()
+            (0..(h / 32_)).map( 
+                |_| (0..(w / 32_)).map(
+                    |_| Vec::with_capacity(256)
                 ).collect()
             ).collect();
 
@@ -262,6 +262,9 @@ impl Frame {
                 )
             });
 
+            //println!("src:{:?}", or);
+            //println!("clip:{:?}", clip4);
+
             if !is_backface(clip4.map_vertex(|v| Vector3::new(v.x, v.y, v.z))) {
                 continue;
             }
@@ -274,15 +277,15 @@ impl Frame {
             let max_y = clip.x.y.ceil().partial_max(clip.y.y.ceil().partial_max(clip.z.y.ceil()));
             let min_y = clip.x.y.floor().partial_min(clip.y.y.floor().partial_min(clip.z.y.floor()));
 
-            let min_x = (max(min_x as i32, 0) as u32) & (0xFFFFFFFF & !0x1F);
-            let min_y = (max(min_y as i32, 0) as u32) & (0xFFFFFFFF & !0x1F);
-            let max_x = min(max_x as u32, w-0x1F);
-            let max_y = min(max_y as u32, h-0x1F);
+            let min_x = (max(min_x as i32, 0) as u32) & (0xFFFFFFFF & !0x1F_);
+            let min_y = (max(min_y as i32, 0) as u32) & (0xFFFFFFFF & !0x1F_);
+            let max_x = min(max_x as u32, w-0x1F_);
+            let max_y = min(max_y as u32, h-0x1F_);
 
-            for y in range_step_inclusive(min_y, max_y, 32) {
-                for x in range_step_inclusive(min_x, max_x, 32) {
-                    let ix = (x / 32) as usize;
-                    let iy = (y / 32) as usize;
+            for y in range_step_inclusive(min_y, max_y, 32_) {
+                for x in range_step_inclusive(min_x, max_x, 32_) {
+                    let ix = (x / 32_) as usize;
+                    let iy = (y / 32_) as usize;
                     commands[ix][iy].push((clip4.clone(), or.clone()));
 
                     if commands[ix][iy].len() == commands[ix][iy].capacity() {
@@ -329,7 +332,7 @@ impl Frame {
                         let clip3 = Vector3::new(clip4.x.z, clip4.y.z, clip4.z.z);
                         let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
                         let bary = Barycentric::new(clip);
-                        t.raster(x*32, y*32, &clip3, &bary, or, &*fragment);
+                        t.raster(x*32_, y*32_, &clip3, &bary, or, &*fragment);
                     }
                     tx.send(t).unwrap();
                 });

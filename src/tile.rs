@@ -20,8 +20,8 @@ pub struct TileMask {
 impl TileMask {
     #[inline(always)]
     /// Calculate the u/v coordinates for the fragment
-    pub fn new(pos: Vector2<f32>, bary: &Barycentric) -> TileMask {
-        let [u, v] =  bary.coordinate_f32x8x8(pos, Vector2::new(1., 1.));
+    pub fn new(x: u32, y: u32, bary: &Barycentric) -> TileMask {
+        let [u, v] =  bary.coordinate_f32x8x8(x, y);
         let uv = f32x8x8::broadcast(1.) - (u + v);
 
         let mask = !(uv.to_bit_u32x8x8().bitmask() |
@@ -43,7 +43,7 @@ impl TileMask {
         let depth = weights.dot(z);
 
         self.mask &= (depth - *d).to_bit_u32x8x8().bitmask();
-        self.mask &= !(depth + f32x8x8::broadcast(1.)).to_bit_u32x8x8().bitmask();
+        self.mask &= !depth.to_bit_u32x8x8().bitmask();
         d.replace(depth, self.mask);
     }
 
@@ -245,8 +245,7 @@ impl Raster for Tile {
             return;
         }
 
-        let off = Vector2::new(x as f32, y as f32);
-        let mut mask = TileMask::new(off, &bary);
+        let mut mask = TileMask::new(x, y, &bary);
         mask.mask_with_depth(z, &mut self.depth);
         for (i, w) in mask.iter() {
             let frag = Interpolate::interpolate(t, w);

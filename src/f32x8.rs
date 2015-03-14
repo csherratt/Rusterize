@@ -32,8 +32,15 @@ impl f32x8 {
     }
 
     #[inline]
-    pub fn range_x() -> f32x8 {
-        f32x8(0., 1., 2., 3., 4., 5., 6., 7.)
+    pub fn range_x(x: u32) -> f32x8 {
+        f32x8((x) as f32,
+              (x + 1) as f32,
+              (x + 2) as f32,
+              (x + 3) as f32,
+              (x + 4) as f32,
+              (x + 5) as f32,
+              (x + 6) as f32,
+              (x + 7) as f32)
     }
 
     #[inline]
@@ -62,27 +69,27 @@ impl f32x8x8 {
     }
 
     #[inline]
-    pub fn range_x() -> f32x8x8 {
-        f32x8x8(f32x8::range_x(), 
-                f32x8::range_x(),
-                f32x8::range_x(),
-                f32x8::range_x(),
-                f32x8::range_x(),
-                f32x8::range_x(),
-                f32x8::range_x(),
-                f32x8::range_x())
+    pub fn range_x(x: u32) -> f32x8x8 {
+        f32x8x8(f32x8::range_x(x), 
+                f32x8::range_x(x),
+                f32x8::range_x(x),
+                f32x8::range_x(x),
+                f32x8::range_x(x),
+                f32x8::range_x(x),
+                f32x8::range_x(x),
+                f32x8::range_x(x))
     }
 
     #[inline]
-    pub fn range_y() -> f32x8x8 {
-        f32x8x8(f32x8::broadcast(0.), 
-                f32x8::broadcast(1.),
-                f32x8::broadcast(2.),
-                f32x8::broadcast(3.),
-                f32x8::broadcast(4.),
-                f32x8::broadcast(5.),
-                f32x8::broadcast(6.),
-                f32x8::broadcast(7.))
+    pub fn range_y(y: u32) -> f32x8x8 {
+        f32x8x8(f32x8::broadcast((y + 0) as f32), 
+                f32x8::broadcast((y + 1) as f32),
+                f32x8::broadcast((y + 2) as f32),
+                f32x8::broadcast((y + 3) as f32),
+                f32x8::broadcast((y + 4) as f32),
+                f32x8::broadcast((y + 5) as f32),
+                f32x8::broadcast((y + 6) as f32),
+                f32x8::broadcast((y + 7) as f32))
     }
 
     #[inline]
@@ -172,6 +179,17 @@ impl Sub<f32x8> for f32x8x8 {
                 self.6 - rhs, self.7 - rhs)
     }
 }
+
+impl Sub<f32x8x8_vec2> for f32x8x8_vec2 {
+    type Output = f32x8x8_vec2;
+
+    #[inline]
+    fn sub(self, rhs: f32x8x8_vec2) -> f32x8x8_vec2 {
+        f32x8x8_vec2([self.0[0] - rhs.0[0],
+                      self.0[1] - rhs.0[1]])
+    }
+}
+
 
 impl Mul<f32x8x8> for f32x8x8 {
     type Output = f32x8x8;
@@ -293,9 +311,15 @@ pub struct f32x8x8_vec2(pub [f32x8x8; 2]);
 
 impl f32x8x8_vec2 {
     #[inline]
-    pub fn range(x: f32, y: f32, xs: f32, ys: f32) -> f32x8x8_vec2 {
-        f32x8x8_vec2([f32x8x8::range_x() * f32x8x8::broadcast(xs) + f32x8x8::broadcast(x),
-                      f32x8x8::range_y() * f32x8x8::broadcast(ys) + f32x8x8::broadcast(y)])
+    pub fn broadcast(v: Vector2<f32>) -> f32x8x8_vec2 {
+        f32x8x8_vec2([f32x8x8::broadcast(v.x),
+                      f32x8x8::broadcast(v.y)])
+    }
+
+    #[inline]
+    pub fn range(x: u32, y: u32) -> f32x8x8_vec2 {
+        f32x8x8_vec2([f32x8x8::range_x(x),
+                      f32x8x8::range_y(y)])
     }
 }
 

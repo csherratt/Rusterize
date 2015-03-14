@@ -207,15 +207,15 @@ fn barycentric_f32x8x8(bench: &mut Bencher) {
                             Vector4::new(1., 1., 0., 0.),
                             Vector4::new(0., 1., 0., 0.));
 
-    let mut x = 0.;
-    let mut y = 0.;
+    let mut x: u32 = 0;
+    let mut y: u32 = 0;
 
     let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
 
     bench.iter(|| {
-        black_box(bary.coordinate_f32x8x8(Vector2::new(x, y), Vector2::new(1., 1.)));
-        x += 1.;
-        y += 1.;
+        black_box(bary.coordinate_f32x8x8(x, y));
+        x += 1;
+        y += 1;
     });
 }
 
@@ -228,15 +228,15 @@ fn group(bench: &mut Bencher) {
                             Vector4::new(1., 1., 0., 0.),
                             Vector4::new(0., 1., 0., 0.));
 
-    let mut x = 0.;
-    let mut y = 0.;
+    let mut x = 0;
+    let mut y = 0;
 
     let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
 
     bench.iter(|| {
-        black_box(TileMask::new(Vector2::new(x, y), &bary));
-        x += 1.;
-        y += 1.;
+        black_box(TileMask::new(x, y, &bary));
+        x += 1;
+        y += 1;
     });
 }
 
@@ -250,17 +250,17 @@ fn mask_with_depth(bench: &mut Bencher) {
                             Vector4::new(1., 1., 0., 0.),
                             Vector4::new(0., 1., 0., 0.));
 
-    let mut x = 0.;
-    let mut y = 0.;
+    let mut x = 0;
+    let mut y = 0;
 
     let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
-    let mut group = TileMask::new(Vector2::new(x, y), &bary);
+    let mut group = TileMask::new(x, y, &bary);
 
     bench.iter(|| {
-        let mut depth = f32x8x8::broadcast(x);
-        black_box(group.mask_with_depth(&Vector3::new(x, y, x), &mut depth));
-        x += 1.;
-        y += 1.;
+        let mut depth = f32x8x8::broadcast(x as f32);
+        black_box(group.mask_with_depth(&Vector3::new(x as f32, y as f32, x as f32), &mut depth));
+        x += 1;
+        y += 1;
     });
 }
 
@@ -274,17 +274,17 @@ fn full_mask(bench: &mut Bencher) {
                             Vector4::new(1., 1., 0., 0.),
                             Vector4::new(0., 1., 0., 0.));
 
-    let mut x = 0.;
-    let mut y = 0.;
+    let mut x = 0;
+    let mut y = 0;
 
     let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
-    let mut depth = f32x8x8::broadcast(x);
+    let mut depth = f32x8x8::broadcast(x as f32);
 
     bench.iter(|| {
-        black_box(TileMask::new(Vector2::new(x, y), &bary)
-                        .mask_with_depth(&Vector3::new(x, y, x), &mut depth));
-        x += 1.;
-        y += 1.;
+        black_box(TileMask::new(x, y, &bary)
+                        .mask_with_depth(&Vector3::new(x as f32, y as f32, x as f32), &mut depth));
+        x += 1;
+        y += 1;
     });
 }
 
