@@ -15,7 +15,7 @@ use image::Rgba;
 
 const SIZE: u32 = 64;
 
-fn check(name: &str, mut frame: Frame) {
+fn check(name: &str, mut frame: Frame<Rgba<u8>>) {
     let frame = frame.to_image();
 
     // Save the image output just incase the test fails
@@ -41,7 +41,7 @@ impl Fragment<[f32; 4]> for SetValue {
 
 #[test]
 fn plane_simple() {
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
     let cube = generators::Plane::new()
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 2.).mul_s(0.5)).into_fixed());
@@ -52,7 +52,7 @@ fn plane_simple() {
 
 #[test]
 fn plane_clip_far() {
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
     let cube = generators::Plane::new()
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 100., 2.).mul_s(0.5)).into_fixed());
@@ -64,7 +64,7 @@ fn plane_clip_far() {
 
 #[test]
 fn plane_clip_near() {
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
     let cube = generators::Plane::new()
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, -100., 2.).mul_s(0.5)).into_fixed());
@@ -75,7 +75,7 @@ fn plane_clip_near() {
 
 #[test]
 fn plane_backface() {
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
     let cube = generators::Plane::new()
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(-v.0, v.1, 0., 2.).mul_s(0.5)).into_fixed());
@@ -86,7 +86,7 @@ fn plane_backface() {
 
 #[test]
 fn plane_fill() {
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
     let cube = generators::Plane::new()
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
@@ -97,7 +97,7 @@ fn plane_fill() {
 
 #[test]
 fn plane_overfill() {
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
     let cube = generators::Plane::new()
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0 * 100., v.1 * 100., 0., 2.)).into_fixed());
@@ -108,7 +108,7 @@ fn plane_overfill() {
 
 #[test]
 fn plane_back_front() {
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
     let cube = generators::Plane::new()
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
@@ -126,7 +126,7 @@ fn plane_back_front() {
 
 #[test]
 fn plane_front_back() {
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
     let cube = generators::Plane::new()
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 1., 1.)).into_fixed());
@@ -158,7 +158,7 @@ fn cube() {
     ];
     let mut i = 0;
 
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
     let cube = generators::Cube::new()
         .triangulate()
         .vertex(|v| proj().mul_v(&rot.mul_v(&Vector4::new(v.0 * 0.5, v.1 * 0.5, v.2 * 0.5, 1.))).into_fixed())
@@ -208,7 +208,7 @@ fn triangle() {
         }
     }
 
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
     frame.raster(triangle.iter().map(|x| *x), V);
     check("triangle", frame);
 }
@@ -234,7 +234,7 @@ fn triangle_flat() {
         }
     }
 
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
     frame.raster(triangle.iter().map(|x| *x), V);
     check("triangle_flat", frame);
 }
@@ -272,19 +272,19 @@ fn monkey() {
         }
     }
 
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
     frame.raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
     check("monkey", frame);
 }
 
 #[test]
 fn buffer_clear() {
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
     let cube = generators::Plane::new()
         .triangulate()
         .vertex(|v| proj().mul_v(&Vector4::new(v.0, v.1, 0., 1.)).into_fixed());
 
     frame.raster(cube, SetValue(Rgba([255, 255, 255, 255])));
-    frame.clear();
+    frame.clear(Rgba([0, 0, 0, 0]));
     check("buffer_clear", frame);
 }

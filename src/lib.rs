@@ -177,28 +177,28 @@ impl Barycentric {
     }
 }
 
-pub struct Frame {
+pub struct Frame<P> {
     pub width: u32,
     pub height: u32,
-    pub tile: Vec<Vec<Future<Box<TileGroup>>>>,
+    pub tile: Vec<Vec<Future<Box<TileGroup<P>>>>>,
     pool: ThreadPool
 }
 
-impl Frame {
-    pub fn new(width: u32, height: u32) -> Frame {
+impl<P: Copy+Send+'static> Frame<P> {
+    pub fn new(width: u32, height: u32, p: P) -> Frame<P> {
         Frame {
             width: width,
             height: height,
             tile: (0..(height / 32_)).map(
                 |_| (0..(width / 32_)).map(
-                    |_| Future::from_value(Box::new(TileGroup::new()))
+                    |_| Future::from_value(Box::new(TileGroup::new(p)))
                 ).collect()
             ).collect(),
             pool: ThreadPool::new(std::os::num_cpus())
         }
     }
 
-    pub fn clear(&mut self) {
+    pub fn clear(&mut self, p: P) {
         use std::mem;
         for row in self.tile.iter_mut() {
             for tile in row.iter_mut() {
@@ -207,30 +207,17 @@ impl Frame {
                 mem::swap(tile, &mut new);
                 self.pool.execute(move || {
                     let mut t = new.get();
-                    t.clear();
+                    t.clear(p);
                     tx.send(t).unwrap();
                 });
             }
         }
     }
 
-    pub fn to_image(&mut self) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
-        let mut buffer = ImageBuffer::new(self.width, self.height);
-
-        for (x, row) in self.tile.iter_mut().enumerate() {
-            for (y, tile) in row.iter_mut().enumerate() {
-                let t = tile.get();
-                t.write((x*32_) as u32, (y*32_) as u32, &mut buffer);
-            }
-        }
-
-        buffer
-    }
-
     pub fn raster<S, F, T, O>(&mut self, poly: S, fragment: F)
         where S: Iterator<Item=Triangle<T>>,
               T: Clone + Interpolate<Out=O> + FetchPosition + Send + Sync + 'static + Debug,
-              F: Fragment<O, Color=Rgba<u8>> + Send + Sync + 'static {
+              F: Fragment<O, Color=P> + Send + Sync + 'static {
 
         use std::cmp::{min, max};
         let h = self.height;
@@ -346,6 +333,21 @@ impl Frame {
                 tile.get();
             }
         }
+    }
+}
+
+impl Frame<Rgba<u8>> {
+    pub fn to_image(&mut self) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+        let mut buffer = ImageBuffer::new(self.width, self.height);
+
+        for (x, row) in self.tile.iter_mut().enumerate() {
+            for (y, tile) in row.iter_mut().enumerate() {
+                let t = tile.get();
+                t.write((x*32_) as u32, (y*32_) as u32, &mut buffer);
+            }
+        }
+
+        buffer
     }
 }
 

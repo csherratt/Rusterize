@@ -56,7 +56,7 @@ fn main() {
     let ka = Vector4::new(16., 16., 16., 1.);
 
     let proj = cgmath::perspective(cgmath::deg(60.0f32), 1.0, 0.01, 100.0);
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
 
     let texture = graphics.device.create_texture(texture_info).unwrap();
 
@@ -136,7 +136,7 @@ fn main() {
             }
         }
 
-        frame.clear();
+        frame.clear(Rgba([0u8, 0, 0, 0]));
         if !raster_order {
             frame.raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
         } else {

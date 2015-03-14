@@ -45,7 +45,7 @@ fn main() {
     };
     let image_info = texture_info.to_image_info();
 
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
     let texture = graphics.device.create_texture(texture_info).unwrap();
 
     let mut texture_frame = gfx::Frame::new(SIZE as u16, SIZE as u16);
@@ -135,7 +135,7 @@ fn main() {
             }
         }
 
-        frame.clear();
+        frame.clear(Rgba([0u8, 0, 0, 0]));
         frame.raster(plane, V{bary: bary});
         graphics.device.update_texture(&texture, &image_info, frame.to_image().as_slice()).unwrap();
 
