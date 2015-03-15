@@ -33,10 +33,10 @@ impl Fragment<([f32; 4], [f32; 3])> for SetValue {
 
 #[bench]
 fn plane_simple(bench: &mut Bencher) {
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
 
     bench.iter(|| {
-        frame.clear();
+        frame.clear(Rgba([0u8, 0, 0, 0]));
         let plane = generators::Plane::new();
         frame.raster(plane.triangulate()
                          .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
@@ -48,7 +48,7 @@ fn plane_simple(bench: &mut Bencher) {
 
 #[bench]
 fn plane_subdivide(bench: &mut Bencher) {
-    let mut frame = Frame::new(64, 64);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
 
     let plane: Vec<Triangle<[f32; 4]>> =
         generators::Plane::subdivide(64 as usize, 64 as usize)
@@ -58,7 +58,7 @@ fn plane_subdivide(bench: &mut Bencher) {
 
 
     bench.iter(|| {
-        frame.clear();
+        frame.clear(Rgba([0u8, 0, 0, 0]));
         frame.raster(plane.iter().map(|x| *x),
             SetValue(Rgba([255, 255, 255, 255]))
         );
@@ -68,10 +68,10 @@ fn plane_subdivide(bench: &mut Bencher) {
 
 #[bench]
 fn plane_backface(bench: &mut Bencher) {
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
 
     bench.iter(|| {
-        frame.clear();
+        frame.clear(Rgba([0u8, 0, 0, 0]));
         let plane = generators::Plane::new();
         frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(-v.0, v.1, 0., 1.).into_fixed()),
@@ -83,10 +83,10 @@ fn plane_backface(bench: &mut Bencher) {
 
 #[bench]
 fn plane_front_back(bench: &mut Bencher) {
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
 
     bench.iter(|| {
-        frame.clear();
+        frame.clear(Rgba([0u8, 0, 0, 0]));
         let plane = generators::Plane::new();
         frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 1., 1.).into_fixed()),
@@ -102,10 +102,10 @@ fn plane_front_back(bench: &mut Bencher) {
 
 #[bench]
 fn plane_back_front(bench: &mut Bencher) {
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
 
     bench.iter(|| {
-        frame.clear();
+        frame.clear(Rgba([0u8, 0, 0, 0]));
         let plane = generators::Plane::new();
         frame.raster(plane.triangulate()
                           .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed()),
@@ -121,10 +121,10 @@ fn plane_back_front(bench: &mut Bencher) {
 
 #[bench]
 fn buffer_clear(bench: &mut Bencher) {
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
 
     bench.iter(|| {
-        frame.clear();
+        frame.clear(Rgba([0u8, 0, 0, 0]));
         frame.flush(); 
     });
 }
@@ -135,7 +135,7 @@ fn monkey(bench: &mut Bencher) {
     let monkey = obj.object_iter().next().unwrap().group_iter().next().unwrap();
 
     let proj = ortho(-1.5, 1.5, -1.5, 1.5, -10., 10.);
-    let mut frame = Frame::new(SIZE, SIZE);
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
 
     bench.iter(|| {
         let vertex = monkey.indices().iter().map(|x| *x)
@@ -143,7 +143,7 @@ fn monkey(bench: &mut Bencher) {
                            .vertex(|(p, n)| (proj.mul_v(&Vector4::new(p[0], p[1], p[2], 1.)).into_fixed(), n))
                            .triangulate();
 
-        frame.clear();
+        frame.clear(Rgba([0u8, 0, 0, 0]));
         frame.raster(vertex, SetValue(Rgba([255, 255, 255, 255])));
         frame.flush();
     });
@@ -318,7 +318,7 @@ fn tile_group_all(bench: &mut Bencher) {
     let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
     let tri = tri.map_vertex(|t| t.into_fixed());
 
-    let mut group = TileGroup::new();
+    let mut group = TileGroup::new(Rgba([0u8, 0, 0, 0]));
     bench.iter(|| {
         group.raster(
             0, 0,
@@ -342,7 +342,7 @@ fn tile_group_one(bench: &mut Bencher) {
     let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
     let tri = tri.map_vertex(|t| t.into_fixed());
 
-    let mut group = TileGroup::new();
+    let mut group = TileGroup::new(Rgba([0u8, 0, 0, 0]));
     bench.iter(|| {
         group.raster(
             0, 0,
@@ -366,7 +366,7 @@ fn tile_group_zero(bench: &mut Bencher) {
     let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
     let tri = tri.map_vertex(|t| t.into_fixed());
 
-    let mut group = TileGroup::new();
+    let mut group = TileGroup::new(Rgba([0u8, 0, 0, 0]));
     bench.iter(|| {
         group.raster(
             0, 0,
@@ -390,7 +390,7 @@ fn tile_all(bench: &mut Bencher) {
     let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
     let tri = tri.map_vertex(|t| t.into_fixed());
 
-    let mut tile = Tile::new();
+    let mut tile = Tile::new(Rgba([0u8, 0, 0, 0]));
     bench.iter(|| {
         tile.raster(
             0, 0,
@@ -414,7 +414,7 @@ fn tile_one(bench: &mut Bencher) {
     let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
     let tri = tri.map_vertex(|t| t.into_fixed());
 
-    let mut tile = Tile::new();
+    let mut tile = Tile::new(Rgba([0u8, 0, 0, 0]));
     bench.iter(|| {
         tile.raster(
             0, 0,
@@ -438,7 +438,7 @@ fn tile_zero(bench: &mut Bencher) {
     let bary = Barycentric::new(tri.map_vertex(|v| Vector2::new(v.x, v.y)));
     let tri = tri.map_vertex(|t| t.into_fixed());
 
-    let mut tile = Tile::new();
+    let mut tile = Tile::new(Rgba([0u8, 0, 0, 0]));
     bench.iter(|| {
         tile.raster(
             0, 0,
