@@ -266,7 +266,9 @@ impl<P: Copy> Raster<P> for Tile<P> {
         mask.mask_with_depth(z, &mut self.depth);
         for (i, w) in mask.iter() {
             let frag = Interpolate::interpolate(t, w);
-            unsafe { *self.color.get_unchecked_mut(i.0 as usize) = fragment.fragment(frag); }
+            let new = fragment.fragment(frag);
+            let dst = unsafe { self.color.get_unchecked_mut(i.0 as usize) };
+            *dst = fragment.blend(*dst, new);
         }
     }
 

@@ -28,6 +28,49 @@ use timeout_iter::TimeoutIter;
 
 const SIZE: u32 = 1024;
 
+#[derive(Clone)]
+struct Index;
+
+impl Fragment<([f32; 4], [f32; 3], u32)> for Index {
+    type Color = (Option<u32>, f32, f32);
+
+    #[inline]
+    fn fragment(&self, (_, uv, i) : ([f32; 4], [f32; 3], u32)) -> (Option<u32>, f32, f32) {
+        (Some(i), uv[1], uv[2])
+    }
+}
+
+#[derive(Clone)]
+struct Shader {
+    ka: Vector4<f32>,
+    kd: Vector4<f32>,
+    light_normal: Vector4<f32>,
+    vertex: Arc<Vec<Triangle<([f32; 3], [f32; 3])>>>
+}
+
+impl Mapping<(Option<u32>, f32, f32)> for Shader {
+    type Out = Rgba<u8>;
+
+    #[inline]
+    fn mapping(&self, (p, a, b): (Option<u32>, f32, f32)) -> Rgba<u8> {
+        match p {
+            Some(v) => {
+                let n = self.vertex[v as usize].map_vertex(|(_, n)| n);
+                let n = Interpolate::interpolate(&n, [1. - (a + b), a, b]);
+                let normal = Vector4::new(n[0], n[1], n[2], 0.);
+                let v = self.kd.mul_s(self.light_normal.dot(&normal).partial_max(0.)) + self.ka;
+                Rgba([v.x as u8, v.y as u8, v.z as u8, 255])
+            }
+            None => Rgba([0, 0, 0, 0])
+        }
+    }
+}
+
+enum RasterType {
+    Normal,
+    Count
+}
+
 fn main() {
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS)
                         .ok().expect("failed to init glfw");
@@ -74,7 +117,7 @@ fn main() {
     texture_frame.colors.push(gfx::Plane::Texture(texture.clone(), 0, None));
 
     let mut show_grid = 0;
-    let mut raster_order = false;
+    let mut raster = RasterType::Normal;
     let mut paused = false;
 
 
@@ -96,8 +139,12 @@ fn main() {
                     window.set_should_close(true),
                 glfw::WindowEvent::Key(glfw::Key::Space, _, glfw::Action::Press, _) =>
                     paused ^= true,
-                glfw::WindowEvent::Key(glfw::Key::R, _, glfw::Action::Press, _) =>
-                    raster_order ^= true,
+                glfw::WindowEvent::Key(glfw::Key::R, _, glfw::Action::Press, _) => {
+                    raster = match raster {
+                        RasterType::Normal => RasterType::Count,
+                        RasterType::Count => RasterType::Normal
+                    };
+                },
                 _ => {},
             }
         }
@@ -112,7 +159,7 @@ fn main() {
             // Slowly circle the center
             let x = (0.25*time).sin();
             let y = (0.25*time).cos();
-            Point3::new(x * 1.0, y * 1.0, 1.0)
+            Point3::new(x * 2.0, y * 2.0, 2.0)
         };
         let view: AffineMatrix3<f32> = Transform::look_at(
             &cam_pos,
@@ -129,62 +176,6 @@ fn main() {
 
         println!("vs {}ms", (end - start) * 1000.);
 
-        #[derive(Clone)]
-        struct Index;
-
-        impl Fragment<([f32; 4], [f32; 3], u32)> for Index {
-            type Color = (Option<u32>, f32, f32);
-
-            #[inline]
-            fn fragment(&self, (_, uv, i) : ([f32; 4], [f32; 3], u32)) -> (Option<u32>, f32, f32) {
-                (Some(i), uv[1], uv[2])
-            }
-        }
-
-        #[derive(Clone)]
-        struct V {
-            ka: Vector4<f32>,
-            kd: Vector4<f32>,
-            light_normal: Vector4<f32>
-        }
-
-        impl Fragment<([f32; 4], [f32; 3])> for V {
-            type Color = Rgba<u8>;
-
-            #[inline]
-            fn fragment(&self, (_, n) : ([f32; 4], [f32; 3])) -> Rgba<u8> {
-                let normal = Vector4::new(n[0], n[1], n[2], 0.);
-                let v = self.kd.mul_s(self.light_normal.dot(&normal).partial_max(0.)) + self.ka;
-                Rgba([v.x as u8, v.y as u8, v.z as u8, 255])
-            }
-        }
-
-        #[derive(Clone)]
-        struct Shader {
-            ka: Vector4<f32>,
-            kd: Vector4<f32>,
-            light_normal: Vector4<f32>,
-            vertex: Arc<Vec<Triangle<([f32; 3], [f32; 3])>>>
-        }
-
-        impl Mapping<(Option<u32>, f32, f32)> for Shader {
-            type Out = Rgba<u8>;
-
-            #[inline]
-            fn mapping(&self, (p, a, b): (Option<u32>, f32, f32)) -> Rgba<u8> {
-                match p {
-                    Some(v) => {
-                        let n = self.vertex[v as usize].map_vertex(|(_, n)| n);
-                        let n = Interpolate::interpolate(&n, [1. - (a + b), a, b]);
-                        let normal = Vector4::new(n[0], n[1], n[2], 0.);
-                        let v = self.kd.mul_s(self.light_normal.dot(&normal).partial_max(0.)) + self.ka;
-                        Rgba([v.x as u8, v.y as u8, v.z as u8, 255])
-                    }
-                    None => Rgba([0, 0, 0, 0])
-                }
-            }
-        }
-
 
         let start = precise_time_s();
         frame.clear((None, 0., 0.));
@@ -197,15 +188,27 @@ fn main() {
                                                       (t.y.0, [0., 1., 0.], Flat(i)),
                                                       (t.z.0, [0., 0., 1.], Flat(i)))
                                     }), Index);
+        let raster = precise_time_s();
+        //frame.flush();
         frame_dst.map(&mut frame, Shader{
             vertex: vertex.clone(),
             ka: ka,
             kd: kd,
             light_normal: light_normal
         });
-        graphics.device.update_texture(&texture, &image_info, frame_dst.to_image().as_slice()).unwrap();
+        //frame_dst.flush();
+        let mapping = precise_time_s();
+        let tex = frame_dst.to_image();
+        let texture_time = precise_time_s();
+        graphics.device.update_texture(&texture, &image_info, tex.as_slice()).unwrap();
         let end = precise_time_s();
-        println!("{}ms", (end - start) * 1000.);
+
+        println!("raster: {:2.4}ms, mapping: {:2.4}ms, texture: {:2.4}ms, sync: {:2.4}ms",
+            (raster - start) * 1000.,
+            (mapping - raster) * 1000.,
+            (texture_time - mapping) * 1000.,
+            (end - texture_time) * 1000.
+        );
 
         graphics.renderer.blit(&texture_frame,
             gfx::Rect{x: 0, y: 0, w: SIZE as u16, h: SIZE as u16},

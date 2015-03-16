@@ -3,6 +3,8 @@
 pub trait Fragment<T> {
     type Color;
     fn fragment(&self, pos: T) -> Self::Color;
+
+    fn blend(&self, _: Self::Color, new: Self::Color) -> Self::Color { new }
 }
 
 pub trait Vertex<T> {

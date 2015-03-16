@@ -50,7 +50,7 @@ fn main() {
     };
     let image_info = texture_info.to_image_info();
 
-    let obj = obj::load(&Path::new("/home/colin/Desktop/dragon.obj")).unwrap();
+    let obj = obj::load(&Path::new("test_assets/monkey.obj")).unwrap();
     let monkey = obj.object_iter().next().unwrap().group_iter().next().unwrap();
 
     let light_normal = Vector4::new(10., 10., 10., 0.).normalize();
@@ -91,7 +91,7 @@ fn main() {
             // Slowly circle the center
             let x = (0.25*time).sin();
             let y = (0.25*time).cos();
-            Point3::new(x * 1.0, y * 1.0, 1.0)
+            Point3::new(x * 2.0, y * 2.0, 2.0)
         };
         let view: AffineMatrix3<f32> = Transform::look_at(
             &cam_pos,
