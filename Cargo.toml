@@ -24,6 +24,11 @@ path = "examples/monkey.rs"
 name = "cull"
 path = "examples/cull.rs"
 
+[[example]]
+name = "two_pass"
+path = "examples/two_pass.rs"
+
+
 [dev-dependencies]
 obj="*"
 glfw="*"

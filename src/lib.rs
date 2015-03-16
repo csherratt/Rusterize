@@ -20,7 +20,7 @@ use genmesh::{Triangle, MapVertex};
 pub use tile::{TileGroup, Tile, Raster};
 use vmath::Dot;
 use f32x8::f32x8x8;
-pub use pipeline::{Fragment, Vertex};
+pub use pipeline::{Fragment, Vertex, Mapping};
 pub use interpolate::{Flat, Interpolate};
 
 mod interpolate;
@@ -322,6 +322,36 @@ impl<P: Copy+Send+'static> Frame<P> {
                         t.raster(x*32_, y*32_, &clip3, &bary, or, &*fragment);
                     }
                     tx.send(t).unwrap();
+                });
+            }
+        }
+    }
+
+    pub fn map<S, F>(&mut self, src: &mut Frame<S>, pixel: F)
+        where F: Mapping<S, Out=P> + Sized + Send + Sync + 'static,
+              S: Send + Sync + 'static + Copy {
+        use std::mem;
+
+        assert!(src.width == self.width);
+        assert!(src.height == self.height);
+
+        let pixel = Arc::new(pixel);
+
+        for (row, src_row) in self.tile.iter_mut().zip(src.tile.iter_mut()) {
+            for (tile, src_tile) in row.iter_mut().zip(src_row.iter_mut()) {
+                let (tx_self, rx) = channel();
+                let mut new = Future::from_receiver(rx);
+                mem::swap(tile, &mut new);
+                let (tx_src, rx) = channel();
+                let mut src = Future::from_receiver(rx);
+                mem::swap(src_tile, &mut src);
+                let pixel = pixel.clone();
+                self.pool.execute(move || {
+                    let mut dst = new.get();
+                    let src = src.get();
+                    dst.map(&src, &*pixel);
+                    tx_self.send(dst).unwrap();
+                    tx_src.send(src).unwrap();
                 });
             }
         }

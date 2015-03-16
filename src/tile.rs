@@ -6,7 +6,7 @@ use cgmath::*;
 use image::{Rgba, ImageBuffer};
 use genmesh::Triangle;
 
-use {Barycentric, Interpolate, Fragment};
+use {Barycentric, Interpolate, Fragment, Mapping};
 use f32x8::{f32x8x8, f32x8x8_vec3};
 
 
@@ -168,6 +168,10 @@ impl<P: Copy> TileGroup<P> {
     pub fn clear(&mut self, p: P) {
         Raster::clear(&mut self.tiles, p);
     }
+
+    pub fn map<S, F>(&mut self, src: &TileGroup<S>, f: &F) where F: Mapping<S, Out=P>, S: Copy {
+        self.tiles.map(&src.tiles, f);
+    }
 }
 
 pub trait Raster<P> {
@@ -179,6 +183,10 @@ pub trait Raster<P> {
 
     fn clear(&mut self, p: P);
     fn write<W: Put<P>>(&self, x: u32, y: u32, v: &mut W);
+}
+
+pub trait ApplyMapping<P, T, P2> {
+    fn map<F>(&mut self, src: &T, f: &F) where F: Mapping<P2, Out=P>;
 }
 
 impl<I, P: Copy> Raster<P> for Quad<I> where I: Raster<P> {
@@ -226,6 +234,14 @@ impl<I, P: Copy> Raster<P> for Quad<I> where I: Raster<P> {
     }
 }
 
+impl<I, I2, P, P2> ApplyMapping<P, Quad<I2>, P2> for Quad<I> where I: ApplyMapping<P, I2, P2> {
+    fn map<F>(&mut self, src: &Quad<I2>, f: &F) where F: Mapping<P2, Out=P> {
+        for (dst, src) in self.0.iter_mut().zip(src.0.iter()) {
+            dst.map(src, f);
+        }
+    }
+}
+
 impl<P: Copy> Raster<P> for Tile<P> {
     #[inline]
     fn size(&self) -> u32 { 8 }
@@ -244,6 +260,9 @@ impl<P: Copy> Raster<P> for Tile<P> {
         }
 
         let mut mask = TileMask::new(x, y, &bary);
+        if mask.mask == 0 {
+            return;
+        }
         mask.mask_with_depth(z, &mut self.depth);
         for (i, w) in mask.iter() {
             let frag = Interpolate::interpolate(t, w);
@@ -262,6 +281,14 @@ impl<P: Copy> Raster<P> for Tile<P> {
     fn clear(&mut self, p: P) {
         self.depth = f32x8x8::broadcast(1.);
         self.color = [p; 64];
+    }
+}
+
+impl<T: Copy, P> ApplyMapping<P, Tile<T>, T> for Tile<P> {
+    fn map<F>(&mut self, src: &Tile<T>, f: &F) where F: Mapping<T, Out=P> {
+        for (dst, src) in self.color.iter_mut().zip(src.color.iter()) {
+            *dst = f.mapping(*src);
+        }
     }
 }
 
