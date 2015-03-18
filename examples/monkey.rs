@@ -1,3 +1,5 @@
+#![feature(core)]
+
 extern crate gfx;
 extern crate gfx_device_gl;
 extern crate glfw;
@@ -16,7 +18,6 @@ use std::path::Path;
 use gfx::traits::*;
 use glfw::Context;
 use genmesh::{Triangulate, MapToVertices};
-use genmesh::generators;
 use rusterize::{Frame, Fragment, Raster};
 use image::Rgba;
 use cgmath::*;
@@ -67,7 +68,6 @@ fn main() {
 
     let mut raster_order = false;
     let mut paused = false;
-    let mut time = precise_time_s() as f32;
 
     while !window.should_close() {
         glfw.poll_events();
@@ -86,7 +86,7 @@ fn main() {
         if paused {
             continue;
         }
-        time = precise_time_s() as f32;
+        let time = precise_time_s() as f32;
         let cam_pos = {
             // Slowly circle the center
             let x = (0.25*time).sin();
@@ -143,7 +143,7 @@ fn main() {
         if !raster_order {
             frame.raster(vertex, V{ka: ka, kd: kd, light_normal: light_normal});
         } else {
-            frame.raster(vertex.vertex(|(p, n)| { p }), RO{v: Arc::new(AtomicUsize::new(0))});
+            frame.raster(vertex.vertex(|(p, _)| { p }), RO{v: Arc::new(AtomicUsize::new(0))});
         }
 
         graphics.device.update_texture(&texture, &image_info, frame.to_image().as_slice()).unwrap();

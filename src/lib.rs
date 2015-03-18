@@ -1,10 +1,11 @@
-#![feature(simd, unboxed_closures, core, std_misc, os)]
+#![feature(simd, unboxed_closures, core, std_misc)]
 #![allow(non_camel_case_types)]
 
 extern crate image;
 extern crate genmesh;
 extern crate cgmath;
 extern crate threadpool;
+extern crate num_cpus;
 
 use std::num::Float;
 use std::sync::{Arc, Future};
@@ -194,7 +195,7 @@ impl<P: Copy+Send+'static> Frame<P> {
                     |_| Future::from_value(Box::new(TileGroup::new(p)))
                 ).collect()
             ).collect(),
-            pool: ThreadPool::new(std::os::num_cpus())
+            pool: ThreadPool::new(num_cpus::get())
         }
     }
 

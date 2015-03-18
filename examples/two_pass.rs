@@ -1,4 +1,4 @@
-#![feature(core, path)]
+#![feature(core)]
 
 extern crate gfx;
 extern crate gfx_device_gl;
@@ -13,7 +13,6 @@ extern crate timeout_iter;
 
 use std::num::Float;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::path::Path;
 
 use gfx::traits::*;
@@ -23,7 +22,6 @@ use rusterize::{Frame, Fragment, Flat, Mapping, Interpolate};
 use image::Rgba;
 use cgmath::*;
 use time::precise_time_s;
-use timeout_iter::TimeoutIter;
 
 
 const SIZE: u32 = 1024;
@@ -39,6 +37,7 @@ impl Fragment<([f32; 4], [f32; 3], u32)> for Index {
         (Some(i), uv[1], uv[2])
     }
 }
+
 
 #[derive(Clone)]
 struct Shader {
@@ -62,6 +61,38 @@ impl Mapping<(Option<u32>, f32, f32)> for Shader {
                 Rgba([v.x as u8, v.y as u8, v.z as u8, 255])
             }
             None => Rgba([0, 0, 0, 0])
+        }
+    }
+}
+
+#[derive(Clone)]
+struct Count;
+
+impl Fragment<([f32; 4], [f32; 3])> for Count {
+    type Color = u32;
+
+    #[inline]
+    fn fragment(&self, _ : ([f32; 4], [f32; 3])) -> u32 { 1 }
+
+    #[inline]
+    fn blend(&self, new: u32, old: u32) -> u32 { new + old }
+}
+
+#[derive(Clone)]
+struct CountToColor;
+
+impl Mapping<u32> for CountToColor {
+    type Out = Rgba<u8>;
+
+    #[inline]
+    fn mapping(&self, value: u32) -> Rgba<u8> {
+        match value {
+            0 => Rgba([0, 0, 0, 255]),
+            1 => Rgba([0, 0, 255, 255]),
+            2 => Rgba([0, 128, 128, 255]),
+            3 => Rgba([0, 255, 0, 255]),
+            4 => Rgba([128, 128, 0, 255]),
+            _ => Rgba([255, 0, 0, 255]),
         }
     }
 }
@@ -97,7 +128,7 @@ fn main() {
     };
     let image_info = texture_info.to_image_info();
 
-    let obj = obj::load(&Path::new("test_assets/monkey.obj")).unwrap();
+    let obj = obj::load(&Path::new("/home/colin/Desktop/hairball.obj")).unwrap();
     let monkey = obj.object_iter().next().unwrap().group_iter().next().unwrap();
 
     let light_normal = Vector4::new(10., 10., 10., 0.).normalize();
@@ -105,10 +136,10 @@ fn main() {
     let ka = Vector4::new(16., 16., 16., 1.);
 
     let proj = cgmath::perspective(cgmath::deg(60.0f32), 1.0, 0.01, 100.0);
-    let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
 
     //let proj = cgmath::ortho(-1., 1., -1., 1., -0.8, 0.8);
     let mut frame = Frame::new(SIZE, SIZE, (None, 0., 0.));
+    let mut frame_cnt = Frame::new(SIZE, SIZE, 0);
     let mut frame_dst = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
 
     let texture = graphics.device.create_texture(texture_info).unwrap();
@@ -116,19 +147,14 @@ fn main() {
     let mut texture_frame = gfx::Frame::new(SIZE as u16, SIZE as u16);
     texture_frame.colors.push(gfx::Plane::Texture(texture.clone(), 0, None));
 
-    let mut show_grid = 0;
     let mut raster = RasterType::Normal;
     let mut paused = false;
-
 
     let vertex: Vec<Triangle<([f32; 3], [f32; 3])>> = monkey.indices().iter().map(|x| *x)
                            .vertex(|(p, _, n)| { (obj.position()[p], obj.normal()[n.unwrap()]) })
                            .triangulate()
                            .collect();
     let vertex = Arc::new(vertex);
-
-    let mut i = 0;
-
     drop(monkey);
 
     while !window.should_close() {
@@ -159,7 +185,7 @@ fn main() {
             // Slowly circle the center
             let x = (0.25*time).sin();
             let y = (0.25*time).cos();
-            Point3::new(x * 2.0, y * 2.0, 2.0)
+            Point3::new(x * 8.0, y * 8.0, 8.0)
         };
         let view: AffineMatrix3<f32> = Transform::look_at(
             &cam_pos,
@@ -168,47 +194,37 @@ fn main() {
         );
         let mat = proj.mul_m(&view.mat);
 
-        let start = precise_time_s();
         let vd: Vec<Triangle<([f32; 4], [f32; 3])>> = vertex.iter().map(|x| *x)
                            .vertex(|(p, n)| (mat.mul_v(&Vector4::new(p[0], p[1], p[2], 1.)).into_fixed(), n))
                            .triangulate().collect();
-        let end = precise_time_s();
-
-        println!("vs {}ms", (end - start) * 1000.);
 
 
-        let start = precise_time_s();
-        frame.clear((None, 0., 0.));
+        match raster {
+            RasterType::Normal => {
+                let mut index = 0;
+                frame.clear((None, 0., 0.));
+                frame.raster(vd.iter().map(|t| {
+                                                let i = index;
+                                                index += 1;
+                                                Triangle::new((t.x.0, [0., 0., 0.], Flat(i)),
+                                                              (t.y.0, [0., 1., 0.], Flat(i)),
+                                                              (t.z.0, [0., 0., 1.], Flat(i)))
+                                            }), Index);
+                frame_dst.map(&mut frame, Shader{
+                    vertex: vertex.clone(),
+                    ka: ka,
+                    kd: kd,
+                    light_normal: light_normal
+                });
+            },
+            RasterType::Count => {
+                frame_cnt.clear(0);
+                frame_cnt.raster(vd.iter().map(|x| *x), Count);
+                frame_dst.map(&mut frame_cnt, CountToColor);
+            }
 
-        let mut index: u32 = 0;
-        frame.raster(vd.iter().map(|t| {
-                                        let i = index;
-                                        index += 1;
-                                        Triangle::new((t.x.0, [0., 0., 0.], Flat(i)),
-                                                      (t.y.0, [0., 1., 0.], Flat(i)),
-                                                      (t.z.0, [0., 0., 1.], Flat(i)))
-                                    }), Index);
-        let raster = precise_time_s();
-        //frame.flush();
-        frame_dst.map(&mut frame, Shader{
-            vertex: vertex.clone(),
-            ka: ka,
-            kd: kd,
-            light_normal: light_normal
-        });
-        //frame_dst.flush();
-        let mapping = precise_time_s();
-        let tex = frame_dst.to_image();
-        let texture_time = precise_time_s();
-        graphics.device.update_texture(&texture, &image_info, tex.as_slice()).unwrap();
-        let end = precise_time_s();
-
-        println!("raster: {:2.4}ms, mapping: {:2.4}ms, texture: {:2.4}ms, sync: {:2.4}ms",
-            (raster - start) * 1000.,
-            (mapping - raster) * 1000.,
-            (texture_time - mapping) * 1000.,
-            (end - texture_time) * 1000.
-        );
+        }
+        graphics.device.update_texture(&texture, &image_info, frame_dst.to_image().as_slice()).unwrap();
 
         graphics.renderer.blit(&texture_frame,
             gfx::Rect{x: 0, y: 0, w: SIZE as u16, h: SIZE as u16},

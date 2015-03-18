@@ -11,6 +11,7 @@ path = "src/lib.rs"
 genmesh = "*"
 cgmath = "*"
 threadpool = "*"
+num_cpus="*"
 
 [dependencies.image]
 git = "https://github.com/PistonDevelopers/image"
