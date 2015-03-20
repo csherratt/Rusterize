@@ -6,12 +6,14 @@ extern crate cgmath;
 extern crate rusterize;
 extern crate obj;
 
+use std::old_io::File;
+use std::path;
+use std::num::Float;
+
 use rusterize::{Frame, Flat, Fragment};
 use cgmath::*;
 use genmesh::generators;
-use genmesh::{Triangulate, MapToVertices};
-use std::old_io::File;
-use std::path;
+use genmesh::{Triangulate, MapToVertices, Quad};
 use image::Rgba;
 
 const SIZE: u32 = 64;
@@ -289,3 +291,42 @@ fn buffer_clear() {
     frame.clear(Rgba([0, 0, 0, 0]));
     check("buffer_clear", frame);
 }
+
+#[derive(Clone)]
+struct CheckerBoard;
+
+impl Fragment<([f32; 4], [f32; 2])> for CheckerBoard {
+    type Color = Rgba<u8>;
+
+    fn fragment(&self, (_, v): ([f32; 4], [f32; 2])) -> Rgba<u8> {
+        let (x, y) = (v[0].floor() as u32, v[1].floor() as u32);
+        
+        if (x & 1) ^ (y & 1) == 0 {
+            Rgba([192, 192, 192, 255])
+        } else {
+            Rgba([64, 64, 64, 255])
+        }
+    }
+}
+
+
+#[test]
+fn plane_checker() {
+    let mut frame = Frame::new(SIZE, SIZE, Rgba([255, 20, 147, 255]));
+    let mat = perspective(deg(90.), 1., 0.5, 2.5);
+    let v = vec![Quad::new(([-0.8, -0.8, -1.0, 1.], [0.000, 0.000]),
+                           ([ 0.8, -0.8, -1.0, 1.], [7.999, 0.000]),
+                           ([ 0.8,  0.8, -2.0, 1.], [7.999, 7.999]),
+                           ([-0.8,  0.8, -2.0, 1.], [0.000, 7.999]))];
+
+    let cube = v.into_iter()
+                .vertex(|(p, t)| {
+                    let p = Vector4::new(p[0], p[1], p[2], p[3]);
+                    (mat.mul_v(&p).into_fixed(), t)
+                })
+                .triangulate();
+
+    frame.raster(cube, CheckerBoard);
+    check("plane_checker", frame);
+}
+
