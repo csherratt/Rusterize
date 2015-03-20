@@ -11,6 +11,7 @@ use cgmath::*;
 use genmesh::generators;
 use genmesh::{Triangulate, MapToVertices};
 use std::old_io::File;
+use std::path;
 use image::Rgba;
 
 const SIZE: u32 = 64;
@@ -241,7 +242,7 @@ fn triangle_flat() {
 
 #[test]
 fn monkey() {
-    let obj = obj::load(&Path::new("test_assets/monkey.obj")).unwrap();
+    let obj = obj::load(&path::Path::new("test_assets/monkey.obj")).unwrap();
     let monkey = obj.object_iter().next().unwrap().group_iter().next().unwrap();
 
     let proj = ortho(-1.5, 1.5, -1.5, 1.5, -10., 10.);

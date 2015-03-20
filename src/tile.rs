@@ -43,7 +43,7 @@ impl TileMask {
         let depth = weights.dot(z);
 
         self.mask &= (depth - *d).to_bit_u32x8x8().bitmask();
-        self.mask &= !depth.to_bit_u32x8x8().bitmask();
+        self.mask &= !(f32x8x8::broadcast(1.) + depth).to_bit_u32x8x8().bitmask();
         d.replace(depth, self.mask);
     }
 
