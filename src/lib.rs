@@ -95,7 +95,8 @@ impl Barycentric {
     }
 
     #[inline]
-    pub fn coordinate(&self, p: Vector3<f32>) -> BarycentricCoordinate {
+    pub fn coordinate(&self, p: Vector2<f32>) -> BarycentricCoordinate {
+        let p = Vector3::new(p.x, p.y, 0.);
         let v2 = p - self.base;
 
         let d00 = self.v0.dot(self.v0);
