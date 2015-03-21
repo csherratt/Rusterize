@@ -125,6 +125,13 @@ impl f32x8x8_vec3 {
     }
 
     #[inline]
+    pub fn range(x: u32, y: u32) -> f32x8x8_vec3 {
+        f32x8x8_vec3([f32x8x8::range_x(x),
+                      f32x8x8::range_y(y),
+                      f32x8x8::broadcast(0.)])
+    }
+
+    #[inline]
     pub fn dot(self, rhs: f32x8x8_vec3) -> f32x8x8 {
         self.0[0] * rhs.0[0] +
         self.0[1] * rhs.0[1] +
@@ -187,6 +194,17 @@ impl Sub<f32x8x8_vec2> for f32x8x8_vec2 {
     fn sub(self, rhs: f32x8x8_vec2) -> f32x8x8_vec2 {
         f32x8x8_vec2([self.0[0] - rhs.0[0],
                       self.0[1] - rhs.0[1]])
+    }
+}
+
+impl Sub<f32x8x8_vec3> for f32x8x8_vec3 {
+    type Output = f32x8x8_vec3;
+
+    #[inline]
+    fn sub(self, rhs: f32x8x8_vec3) -> f32x8x8_vec3 {
+        f32x8x8_vec3([self.0[0] - rhs.0[0],
+                      self.0[1] - rhs.0[1],
+                      self.0[2] - rhs.0[2]])
     }
 }
 
@@ -382,12 +400,30 @@ impl Dot<f32x8x8_vec2> for Vector2<f32> {
     }
 }
 
+impl Dot<f32x8x8_vec3> for Vector3<f32> {
+    type Output = f32x8x8;
+
+    #[inline]
+    fn dot(self, rhs: f32x8x8_vec3) -> f32x8x8 {
+        rhs.0[0] * self.x + rhs.0[1] * self.y + rhs.0[2] * self.z
+    }
+}
+
 impl Dot<Vector2<f32>> for Vector2<f32> {
     type Output = f32;
 
     #[inline]
     fn dot(self, rhs: Vector2<f32>) -> f32 {
         rhs.x * self.x + rhs.y * self.y
+    }
+}
+
+impl Dot<Vector3<f32>> for Vector3<f32> {
+    type Output = f32;
+
+    #[inline]
+    fn dot(self, rhs: Vector3<f32>) -> f32 {
+        rhs.x * self.x + rhs.y * self.y + rhs.z * self.z
     }
 }
 

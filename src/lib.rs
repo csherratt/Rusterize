@@ -45,14 +45,14 @@ pub fn is_backface(v: Triangle<Vector3<f32>>)-> bool {
     let e0 = v.z - v.x;
     let e1 = v.z - v.y;
     let normal = e1.cross(&e0);
-    Vector3::new(0., 0., 1.).dot(&normal) >= 0.
+    Vector3::new(0., 0., 1.).dot(normal) >= 0.
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct Barycentric {
-    pub v0: Vector2<f32>,
-    pub v1: Vector2<f32>,
-    pub base: Vector2<f32>,
+    pub v0: Vector3<f32>,
+    pub v1: Vector3<f32>,
+    pub base: Vector3<f32>,
     inv_denom: f32
 }
 
@@ -76,7 +76,7 @@ impl BarycentricCoordinate {
 }
 
 impl Barycentric {
-    pub fn new(t: Triangle<Vector2<f32>>) -> Barycentric {
+    pub fn new(t: Triangle<Vector3<f32>>) -> Barycentric {
         let v0 = t.y - t.x;
         let v1 = t.z - t.x;
 
@@ -95,7 +95,7 @@ impl Barycentric {
     }
 
     #[inline]
-    pub fn coordinate(&self, p: Vector2<f32>) -> BarycentricCoordinate {
+    pub fn coordinate(&self, p: Vector3<f32>) -> BarycentricCoordinate {
         let v2 = p - self.base;
 
         let d00 = self.v0.dot(self.v0);
@@ -115,12 +115,13 @@ impl Barycentric {
 
     #[inline]
     pub fn coordinate_f32x4(&self, p: Vector2<f32>, s: Vector2<f32>) -> [f32x4::f32x4; 2] {
-        use f32x4::{f32x4, f32x4_vec2};
+        use f32x4::{f32x4, f32x4_vec3};
+        let p = Vector3::new(p.x, p.y, 0.);
         let v2 = p - self.base;
 
-        let v0 = f32x4_vec2::broadcast(self.v0);
-        let v1 = f32x4_vec2::broadcast(self.v1);
-        let v2 = f32x4_vec2::range(v2.x, v2.y, s.x, s.y);
+        let v0 = f32x4_vec3::broadcast(self.v0);
+        let v1 = f32x4_vec3::broadcast(self.v1);
+        let v2 = f32x4_vec3::range(v2.x, v2.y, s.x, s.y);
 
         let d00 = v0.dot(v0);
         let d01 = v0.dot(v1);
@@ -136,9 +137,9 @@ impl Barycentric {
 
     #[inline]
     pub fn coordinate_f32x8x8(&self, x: u32, y: u32) -> [f32x8::f32x8x8; 2] {
-        use f32x8::{f32x8x8, f32x8x8_vec2};
+        use f32x8::{f32x8x8, f32x8x8_vec3};
 
-        let v2 = f32x8x8_vec2::range(x, y) - f32x8x8_vec2::broadcast(self.base);
+        let v2 = f32x8x8_vec3::range(x, y) - f32x8x8_vec3::broadcast(self.base);
 
         let d00 = self.v0.dot(self.v0);
         let d01 = self.v0.dot(self.v1);
@@ -289,7 +290,7 @@ impl<P: Copy+Send+'static> Frame<P> {
                             let mut t = new.get();
                             for (clip4, ref or) in tile_poly.into_iter() {
                                 let clip3 = Vector3::new(clip4.x.z, clip4.y.z, clip4.z.z);
-                                let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
+                                let clip = clip4.map_vertex(|v| Vector3::new(v.x, v.y, v.z));
                                 let bary = Barycentric::new(clip);
                                 t.raster(x, y, &clip3, &bary, or, &*fragment);
                             }
@@ -318,7 +319,7 @@ impl<P: Copy+Send+'static> Frame<P> {
                     let mut t = new.get();
                     for (clip4, ref or) in tile_poly.into_iter() {
                         let clip3 = Vector3::new(clip4.x.z, clip4.y.z, clip4.z.z);
-                        let clip = clip4.map_vertex(|v| Vector2::new(v.x, v.y));
+                        let clip = clip4.map_vertex(|v| Vector3::new(v.x, v.y, v.z));
                         let bary = Barycentric::new(clip);
                         t.raster(x*32_, y*32_, &clip3, &bary, or, &*fragment);
                     }

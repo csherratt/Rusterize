@@ -53,6 +53,30 @@ impl f32x4_vec2 {
 }
 
 #[derive(Copy, Debug)]
+pub struct f32x4_vec3(pub [f32x4; 3]);
+
+impl f32x4_vec3 {
+    #[inline]
+    pub fn broadcast(v: Vector3<f32>) -> f32x4_vec3 {
+        f32x4_vec3([f32x4::broadcast(v.x),
+                    f32x4::broadcast(v.y),
+                    f32x4::broadcast(v.z)])
+    }
+
+    #[inline]
+    pub fn range(x: f32, y: f32, xs: f32, ys: f32) -> f32x4_vec3 {
+        f32x4_vec3([f32x4::range_x() * f32x4::broadcast(xs) + f32x4::broadcast(x),
+                    f32x4::range_y() * f32x4::broadcast(ys) + f32x4::broadcast(y),
+                    f32x4::broadcast(0.)])
+    }
+
+    #[inline]
+    pub fn dot(self, rhs: f32x4_vec3) -> f32x4 {
+        self.0[0] * rhs.0[0] + self.0[1] * rhs.0[1] + self.0[2] * rhs.0[2]
+    }
+}
+
+#[derive(Copy, Debug)]
 #[simd]
 pub struct u32x4(pub u32, pub u32, pub u32, pub u32);
 

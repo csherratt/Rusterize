@@ -56,7 +56,7 @@ fn main() {
         Vector2::new( 0.5, -0.5),
         Vector2::new( 0.0,  0.5),
     ).map_vertex(|v| {
-        Vector2::new(v.x * 512. + 512., v.y * 512. + 512.)
+        Vector3::new(v.x * 512. + 512., v.y * 512. + 512., 0.)
     });
     let mut bary = Barycentric::new(tri);
 
@@ -74,7 +74,7 @@ fn main() {
                         Vector2::new(between.ind_sample(&mut rng), between.ind_sample(&mut rng)),
                         Vector2::new(between.ind_sample(&mut rng), between.ind_sample(&mut rng)),
                     ).map_vertex(|v| {
-                        Vector2::new(v.x * 512. + 512., v.y * 512. + 512.)
+                        Vector3::new(v.x * 512. + 512., v.y * 512. + 512., 0.)
                     });
                     bary = Barycentric::new(tri);
                 }
@@ -100,7 +100,7 @@ fn main() {
             type Color = Rgba<u8>;
 
             fn fragment(&self, (_, screen) : ([f32; 4], [f32; 2])) -> Rgba<u8> {
-                let coord = self.bary.coordinate(Vector2::new(screen[0], screen[1]));
+                let coord = self.bary.coordinate(Vector3::new(screen[0], screen[1], 0.));
 
                 let x0 = screen[0] as u32 & !0x7;
                 let y0 = screen[1] as u32 & !0x7;
