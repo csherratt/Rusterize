@@ -20,8 +20,8 @@ pub struct TileMask {
 impl TileMask {
     #[inline(always)]
     /// Calculate the u/v coordinates for the fragment
-    pub fn new(x: u32, y: u32, bary: &Barycentric) -> TileMask {
-        let [u, v] =  bary.coordinate_f32x8x8(x, y);
+    pub fn new(pos: Vector2<f32>, scale: Vector2<f32>, bary: &Barycentric) -> TileMask {
+        let [u, v] =  bary.coordinate_f32x8x8(pos, scale);
         let uv = f32x8x8::broadcast(1.) - (u + v);
 
         let mask = !(uv.to_bit_u32x8x8().bitmask() |
@@ -158,11 +158,17 @@ impl<P: Copy> TileGroup<P> {
         self.tiles.write(x, y, v);
     }
 
-    pub fn raster<F, T, O>(&mut self, x: u32, y: u32, z: &Vector3<f32>, bary: &Barycentric, t: &Triangle<T>, fragment: &F) where
+    pub fn raster<F, T, O>(&mut self,
+                           pos: Vector2<f32>,
+                           scale: Vector2<f32>,
+                           z: &Vector3<f32>,
+                           bary: &Barycentric,
+                           t: &Triangle<T>,
+                           fragment: &F) where
               T: Interpolate<Out=O>,
               F: Fragment<O, Color=P> {
 
-        self.tiles.raster(x, y, z, bary, t, fragment);
+        self.tiles.raster(pos, scale, z, bary, t, fragment);
     }
 
     pub fn clear(&mut self, p: P) {
@@ -177,7 +183,13 @@ impl<P: Copy> TileGroup<P> {
 pub trait Raster<P> {
     fn mask(&self) -> u32 { 0xFFFF_FFFF - (self.size() - 1) }
     fn size(&self) -> u32;
-    fn raster<F, T, O>(&mut self, x: u32, y: u32, z: &Vector3<f32>, bary: &Barycentric, t: &Triangle<T>, fragment: &F) where
+    fn raster<F, T, O>(&mut self,
+                       pos: Vector2<f32>,
+                       scale: Vector2<f32>,
+                       z: &Vector3<f32>,
+                       bary: &Barycentric,
+                       t: &Triangle<T>,
+                       fragment: &F) where
               T: Interpolate<Out=O>,
               F: Fragment<O, Color=P>;
 
@@ -195,8 +207,8 @@ impl<I, P: Copy> Raster<P> for Quad<I> where I: Raster<P> {
 
     #[inline]
     fn raster<F, T, O>(&mut self,
-                       x: u32,
-                       y: u32,
+                       pos: Vector2<f32>,
+                       scale: Vector2<f32>,
                        z: &Vector3<f32>,
                        bary: &Barycentric,
                        t: &Triangle<T>,
@@ -204,17 +216,11 @@ impl<I, P: Copy> Raster<P> for Quad<I> where I: Raster<P> {
               T: Interpolate<Out=O>,
               F: Fragment<O, Color=P> {
 
-        let off = Vector2::new(x as f32, y as f32);
-        let size = (self.size() - 1) as f32;
-        if bary.tile_fast_check(off, Vector2::new(size, size)) {
-            return;
-        }
-
-        let tsize = self.0[0].size();
-        self.0[0].raster(x,       y,       z, bary, t, fragment);
-        self.0[1].raster(x+tsize, y,       z, bary, t, fragment);
-        self.0[2].raster(x,       y+tsize, z, bary, t, fragment);
-        self.0[3].raster(x+tsize, y+tsize, z, bary, t, fragment);
+        let tsize = scale.mul_s(self.0[0].size() as f32);
+        self.0[0].raster(pos,                     scale, z, bary, t, fragment);
+        self.0[1].raster(pos + vec2(tsize.x, 0.), scale, z, bary, t, fragment);
+        self.0[2].raster(pos + vec2(0., tsize.y), scale, z, bary, t, fragment);
+        self.0[3].raster(pos + tsize,             scale, z, bary, t, fragment);
     }
 
     #[inline]
@@ -248,21 +254,20 @@ impl<P: Copy> Raster<P> for Tile<P> {
 
     #[inline]
     fn raster<F, T, O>(&mut self,
-                       x: u32, y: u32, z: &Vector3<f32>,
+                       pos: Vector2<f32>,
+                       scale: Vector2<f32>,
+                       z: &Vector3<f32>,
                        bary: &Barycentric,
-                       t: &Triangle<T>, fragment: &F) where
+                       t: &Triangle<T>,
+                       fragment: &F) where
               T: Interpolate<Out=O>,
               F: Fragment<O, Color=P> {
 
-        let off = Vector2::new(x as f32, y as f32);
-        if bary.tile_fast_check(off, Vector2::new(7., 7.)) {
-            return;
-        }
-
-        let mut mask = TileMask::new(x, y, &bary);
+        let mut mask = TileMask::new(pos, scale, &bary);
         if mask.mask == 0 {
             return;
         }
+
         mask.mask_with_depth(z, &mut self.depth);
         for (i, w) in mask.iter() {
             let frag = Interpolate::interpolate(t, w);
@@ -300,6 +305,7 @@ pub trait Put<P> {
 
 impl Put<Rgba<u8>> for ImageBuffer<Rgba<u8>, Vec<u8>> {
     fn put(&mut self, x: u32, y: u32, p: Rgba<u8>) {
-        self.put_pixel(x, y, p);
+        let h = self.height();
+        self.put_pixel(x, h - 1 - y, p);
     }
 }

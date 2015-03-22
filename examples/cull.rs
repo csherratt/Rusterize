@@ -58,7 +58,7 @@ fn main() {
     ).map_vertex(|v| {
         Vector3::new(v.x * 512. + 512., v.y * 512. + 512., 0.)
     });
-    let mut bary = Barycentric::new(tri);
+    let mut bary = Barycentric::new(tri.map_vertex(|v| v.truncate()));
 
     while !window.should_close() {
         glfw.poll_events();
@@ -76,7 +76,7 @@ fn main() {
                     ).map_vertex(|v| {
                         Vector3::new(v.x * 512. + 512., v.y * 512. + 512., 0.)
                     });
-                    bary = Barycentric::new(tri);
+                    bary = Barycentric::new(tri.map_vertex(|v| v.truncate()));
                 }
                 _ => {},
             }

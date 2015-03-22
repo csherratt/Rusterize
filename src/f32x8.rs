@@ -32,15 +32,15 @@ impl f32x8 {
     }
 
     #[inline]
-    pub fn range_x(x: u32) -> f32x8 {
-        f32x8((x) as f32,
-              (x + 1) as f32,
-              (x + 2) as f32,
-              (x + 3) as f32,
-              (x + 4) as f32,
-              (x + 5) as f32,
-              (x + 6) as f32,
-              (x + 7) as f32)
+    pub fn range_x(x: f32, scale: f32) -> f32x8 {
+        f32x8((x + 0. * scale),
+              (x + 1. * scale),
+              (x + 2. * scale),
+              (x + 3. * scale),
+              (x + 4. * scale),
+              (x + 5. * scale),
+              (x + 6. * scale),
+              (x + 7. * scale))
     }
 
     #[inline]
@@ -69,27 +69,27 @@ impl f32x8x8 {
     }
 
     #[inline]
-    pub fn range_x(x: u32) -> f32x8x8 {
-        f32x8x8(f32x8::range_x(x), 
-                f32x8::range_x(x),
-                f32x8::range_x(x),
-                f32x8::range_x(x),
-                f32x8::range_x(x),
-                f32x8::range_x(x),
-                f32x8::range_x(x),
-                f32x8::range_x(x))
+    pub fn range_x(x: f32, scale: f32) -> f32x8x8 {
+        f32x8x8(f32x8::range_x(x, scale),
+                f32x8::range_x(x, scale),
+                f32x8::range_x(x, scale),
+                f32x8::range_x(x, scale),
+                f32x8::range_x(x, scale),
+                f32x8::range_x(x, scale),
+                f32x8::range_x(x, scale),
+                f32x8::range_x(x, scale))
     }
 
     #[inline]
-    pub fn range_y(y: u32) -> f32x8x8 {
-        f32x8x8(f32x8::broadcast((y + 0) as f32), 
-                f32x8::broadcast((y + 1) as f32),
-                f32x8::broadcast((y + 2) as f32),
-                f32x8::broadcast((y + 3) as f32),
-                f32x8::broadcast((y + 4) as f32),
-                f32x8::broadcast((y + 5) as f32),
-                f32x8::broadcast((y + 6) as f32),
-                f32x8::broadcast((y + 7) as f32))
+    pub fn range_y(y: f32, scale: f32) -> f32x8x8 {
+        f32x8x8(f32x8::broadcast((y + 0. * scale)), 
+                f32x8::broadcast((y + 1. * scale)),
+                f32x8::broadcast((y + 2. * scale)),
+                f32x8::broadcast((y + 3. * scale)),
+                f32x8::broadcast((y + 4. * scale)),
+                f32x8::broadcast((y + 5. * scale)),
+                f32x8::broadcast((y + 6. * scale)),
+                f32x8::broadcast((y + 7. * scale)))
     }
 
     #[inline]
@@ -125,9 +125,9 @@ impl f32x8x8_vec3 {
     }
 
     #[inline]
-    pub fn range(x: u32, y: u32) -> f32x8x8_vec3 {
-        f32x8x8_vec3([f32x8x8::range_x(x),
-                      f32x8x8::range_y(y),
+    pub fn range(pos: Vector2<f32>, scale: Vector2<f32>) -> f32x8x8_vec3 {
+        f32x8x8_vec3([f32x8x8::range_x(pos.x, scale.x),
+                      f32x8x8::range_y(pos.y, scale.y),
                       f32x8x8::broadcast(0.)])
     }
 
@@ -335,9 +335,9 @@ impl f32x8x8_vec2 {
     }
 
     #[inline]
-    pub fn range(x: u32, y: u32) -> f32x8x8_vec2 {
-        f32x8x8_vec2([f32x8x8::range_x(x),
-                      f32x8x8::range_y(y)])
+    pub fn range(pos: Vector2<f32>, scale: Vector2<f32>) -> f32x8x8_vec2 {
+        f32x8x8_vec2([f32x8x8::range_x(pos.x, scale.x),
+                      f32x8x8::range_y(pos.y, scale.y)])
     }
 }
 
