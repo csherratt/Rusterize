@@ -10,7 +10,7 @@ use {Barycentric, Interpolate, Fragment, Mapping};
 use f32x8::{f32x8x8, f32x8x8_vec3};
 
 
-#[derive(Copy, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct TileMask {
     u: f32x8x8,
     v: f32x8x8,
@@ -57,7 +57,7 @@ impl TileMask {
     }
 }
 
-#[derive(Copy, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct TileIndex(pub u32);
 
 impl TileIndex {
@@ -131,6 +131,12 @@ struct Quad<T>(pub [T; 4]);
 impl<T: Copy> Quad<T> {
     pub fn new(t: T) -> Quad<T> {
         Quad([t, t, t, t])
+    }
+}
+
+impl<T: Copy> Clone for Quad<T> {
+    fn clone(&self) -> Quad<T> {
+        Quad(self.0)
     }
 }
 

@@ -1,7 +1,7 @@
 use std::mem;
 use cgmath::*;
 
-#[derive(Copy, Debug)]
+#[derive(Clone, Copy, Debug)]
 #[simd]
 pub struct f32x4(pub f32, pub f32, pub f32, pub f32);
 
@@ -30,7 +30,7 @@ impl f32x4 {
     }
 }
 
-#[derive(Copy, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct f32x4_vec2(pub [f32x4; 2]);
 
 impl f32x4_vec2 {
@@ -52,7 +52,7 @@ impl f32x4_vec2 {
     }
 }
 
-#[derive(Copy, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct f32x4_vec3(pub [f32x4; 3]);
 
 impl f32x4_vec3 {
@@ -76,7 +76,7 @@ impl f32x4_vec3 {
     }
 }
 
-#[derive(Copy, Debug)]
+#[derive(Clone, Copy, Debug)]
 #[simd]
 pub struct u32x4(pub u32, pub u32, pub u32, pub u32);
 
@@ -100,7 +100,7 @@ impl u32x4 {
 }
 
 
-#[derive(Copy, Debug)]
+#[derive(Clone, Copy, Debug)]
 #[simd]
 pub struct u32x2(pub u32, pub u32);
 

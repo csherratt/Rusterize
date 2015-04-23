@@ -1,4 +1,4 @@
-#![feature(simd, unboxed_closures, core, std_misc)]
+#![feature(simd, unboxed_closures, core, slice_patterns, std_misc)]
 #![allow(non_camel_case_types)]
 
 extern crate image;
