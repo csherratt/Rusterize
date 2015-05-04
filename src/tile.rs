@@ -1,6 +1,5 @@
 
 use std::mem;
-use std::num::Int;
 
 use cgmath::*;
 use image::{Rgba, ImageBuffer};

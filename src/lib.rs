@@ -1,4 +1,4 @@
-#![feature(simd, unboxed_closures, core, slice_patterns, std_misc)]
+#![feature(simd, unboxed_closures, core, slice_patterns, std_misc, step_by)]
 #![allow(non_camel_case_types)]
 
 extern crate image;
@@ -7,10 +7,8 @@ extern crate cgmath;
 extern crate threadpool;
 extern crate num_cpus;
 
-use std::num::Float;
 use std::sync::{Arc, Future};
 use std::sync::mpsc::channel;
-use std::iter::range_step_inclusive;
 use std::fmt::Debug;
 
 use threadpool::ThreadPool;
@@ -261,8 +259,8 @@ impl<P: Copy+Send+'static> Frame<P> {
             let max_x = min(max_x as u32, w-0x1F_);
             let max_y = min(max_y as u32, h-0x1F_);
 
-            for y in range_step_inclusive(min_y, max_y, 32_) {
-                for x in range_step_inclusive(min_x, max_x, 32_) {
+            for y in (min_y..max_y).step_by(32) {
+                for x in (min_x..max_x).step_by(32) {
                     let ix = (x / 32_) as usize;
                     let iy = (y / 32_) as usize;
                     commands[ix][iy].push((clip.clone(), or.clone()));
