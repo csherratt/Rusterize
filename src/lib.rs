@@ -259,8 +259,8 @@ impl<P: Copy+Send+'static> Frame<P> {
             let max_x = min(max_x as u32, w-0x1F_);
             let max_y = min(max_y as u32, h-0x1F_);
 
-            for y in (min_y..max_y).step_by(32) {
-                for x in (min_x..max_x).step_by(32) {
+            for y in (min_y..max_y+1).step_by(32) {
+                for x in (min_x..max_x+1).step_by(32) {
                     let ix = (x / 32_) as usize;
                     let iy = (y / 32_) as usize;
                     commands[ix][iy].push((clip.clone(), or.clone()));

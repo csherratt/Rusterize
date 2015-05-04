@@ -1,4 +1,4 @@
-#![feature(test, old_path, core)]
+#![feature(test, core)]
 
 extern crate image;
 extern crate genmesh;
@@ -9,6 +9,7 @@ extern crate obj;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::path::Path;
 use rusterize::{Frame, Fragment, TileGroup, Tile, Raster};
 use cgmath::*;
 use genmesh::*;
@@ -151,7 +152,6 @@ fn monkey(bench: &mut Bencher) {
 
 #[bench]
 fn trailing_zeros(bench: &mut Bencher) {
-    use std::num::Int;
     let mut i = 0u64;
     bench.iter(|| {
         black_box(if i.trailing_zeros() >= 16 { 0 } else { 1 });
@@ -199,6 +199,7 @@ fn barycentric_f32x4(bench: &mut Bencher) {
     });
 }
 
+/*
 #[bench]
 fn barycentric_f32x8x8(bench: &mut Bencher) {
     use rusterize::Barycentric;
@@ -218,6 +219,7 @@ fn barycentric_f32x8x8(bench: &mut Bencher) {
         y += 1;
     });
 }
+
 
 #[bench]
 fn group(bench: &mut Bencher) {
@@ -264,6 +266,7 @@ fn mask_with_depth(bench: &mut Bencher) {
     });
 }
 
+
 #[bench]
 fn full_mask(bench: &mut Bencher) {
     use rusterize::Barycentric;
@@ -287,6 +290,7 @@ fn full_mask(bench: &mut Bencher) {
         y += 1;
     });
 }
+*/
 
 #[bench]
 fn tile_fast_check(bench: &mut Bencher) {
@@ -307,6 +311,7 @@ fn tile_fast_check(bench: &mut Bencher) {
     });
 }
 
+/*
 #[bench]
 fn tile_group_all(bench: &mut Bencher) {
     use rusterize::Barycentric;
@@ -330,7 +335,9 @@ fn tile_group_all(bench: &mut Bencher) {
     });
     black_box(group);
 }
+*/
 
+/*
 #[bench]
 fn tile_group_one(bench: &mut Bencher) {
     use rusterize::Barycentric;
@@ -450,3 +457,4 @@ fn tile_zero(bench: &mut Bencher) {
     });
     black_box(tile);
 }
+*/

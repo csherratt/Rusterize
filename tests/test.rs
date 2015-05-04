@@ -1,14 +1,11 @@
-#![feature(old_path, old_io)]
-
 extern crate image;
 extern crate genmesh;
 extern crate cgmath;
 extern crate rusterize;
 extern crate obj;
 
-use std::old_io::File;
-use std::path;
-use std::num::Float;
+use std::path::{self, Path};
+use std::fs::File;
 
 use rusterize::{Frame, Flat, Fragment};
 use cgmath::*;
@@ -26,7 +23,7 @@ fn check(name: &str, mut frame: Frame<Rgba<u8>>) {
     let _= image::ImageRgba8(frame.clone()).save(&mut fout, image::PNG);
 
     let expected = image::open(&Path::new("test_data/expected").join(format!("{}.frame.png", name))).unwrap();
-    assert!(expected.raw_pixels() == frame.as_slice());
+    assert!(expected.raw_pixels() == frame.into_raw());
 }
 
 fn proj() -> Matrix4<f32> {

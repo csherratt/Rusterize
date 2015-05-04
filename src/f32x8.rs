@@ -353,10 +353,10 @@ impl u32x8x8 {
         let mask = u32x8::broadcast(0x8000_0000);
         let scale = u32x8(0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80);
         unsafe {
-         (overflowing_mul(((self.0 & mask) >> u32x8::broadcast(31)), scale) |
-          overflowing_mul(((self.1 & mask) >> u32x8::broadcast(23)), scale) |
-          overflowing_mul(((self.2 & mask) >> u32x8::broadcast(15)), scale) |
-          overflowing_mul(((self.3 & mask) >> u32x8::broadcast(7)), scale)).or_self()
+         (overflowing_mul((self.0 & mask) / u32x8::broadcast(0x8000_0000), scale) |
+          overflowing_mul((self.1 & mask) / u32x8::broadcast(0x0080_0000), scale) |
+          overflowing_mul((self.2 & mask) / u32x8::broadcast(0x0000_8000), scale) |
+          overflowing_mul((self.3 & mask) / u32x8::broadcast(0x0000_0080), scale)).or_self()
         }
     }
 
@@ -367,10 +367,10 @@ impl u32x8x8 {
         let mask = u32x8::broadcast(0x8000_0000);
         let scale = u32x8(0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80);
         unsafe {
-        (overflowing_mul(((self.4 & mask) >> u32x8::broadcast(31)), scale) |
-         overflowing_mul(((self.5 & mask) >> u32x8::broadcast(23)), scale) |
-         overflowing_mul(((self.6 & mask) >> u32x8::broadcast(15)), scale) |
-         overflowing_mul(((self.7 & mask) >> u32x8::broadcast(7)), scale)).or_self()
+         (overflowing_mul((self.4 & mask) / u32x8::broadcast(0x8000_0000), scale) |
+          overflowing_mul((self.5 & mask) / u32x8::broadcast(0x0080_0000), scale) |
+          overflowing_mul((self.6 & mask) / u32x8::broadcast(0x0000_8000), scale) |
+          overflowing_mul((self.7 & mask) / u32x8::broadcast(0x0000_0080), scale)).or_self()
         }
     }
 

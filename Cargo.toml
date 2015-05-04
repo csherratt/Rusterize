@@ -17,26 +17,26 @@ num_cpus="*"
 git = "https://github.com/PistonDevelopers/image"
 
 
-[[example]]
-name = "monkey"
-path = "examples/monkey.rs"
+#[[example]]
+#name = "monkey"
+#path = "examples/monkey.rs"
 
-[[example]]
-name = "cull"
-path = "examples/cull.rs"
+#[[example]]
+#name = "cull"
+#path = "examples/cull.rs"
 
-[[example]]
-name = "two_pass"
-path = "examples/two_pass.rs"
+#[[example]]
+#name = "two_pass"
+#path = "examples/two_pass.rs"
 
 
 [dev-dependencies]
 obj="*"
-glfw="*"
+#glfw="*"
 time="*"
 rand="*"
-gfx="*"
-gfx_device_gl="*"
+#gfx="*"
+#gfx_device_gl="*"
 
-[dev-dependencies.timeout_iter]
-git="https://github.com/csherratt/timeout_iter"
+#[dev-dependencies.timeout_iter]
+#git="https://github.com/csherratt/timeout_iter"
