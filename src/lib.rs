@@ -4,17 +4,22 @@
 extern crate image;
 extern crate genmesh;
 extern crate cgmath;
-extern crate threadpool;
-extern crate num_cpus;
+extern crate fibe;
+extern crate snowstorm;
+extern crate future_pulse;
+extern crate pulse;
 
-use std::sync::{Arc, Future};
-use std::sync::mpsc::channel;
+use std::sync::Arc;
 use std::fmt::Debug;
+use std::thread;
 
-use threadpool::ThreadPool;
+use fibe::{Frontend, task, ResumableTask, WaitState, Schedule, IntoTask};
 use image::{GenericImage, ImageBuffer, Rgba};
 use cgmath::*;
 use genmesh::{Triangle, MapVertex};
+use future_pulse::*;
+use pulse::*;
+use snowstorm::channel::*;
 
 pub use tile::{TileGroup, Tile, Raster};
 use vmath::Dot;
@@ -182,10 +187,45 @@ pub struct Frame<P> {
     pub width: u32,
     pub height: u32,
     pub tile: Vec<Vec<Future<Box<TileGroup<P>>>>>,
-    pool: ThreadPool
+    pool: Frontend
 }
 
-impl<P: Copy+Send+'static> Frame<P> {
+struct RasterWorker<P: Send, T: Send+Sync, F> {
+    tile: Option<Box<TileGroup<P>>>,
+    polygons: Receiver<(Triangle<Vector3<f32>>, Triangle<T>)>,
+    pos: Vector2<f32>,
+    scale: Vector2<f32>,
+    fragment: Arc<F>,
+    result: Option<future_pulse::Set<Box<TileGroup<P>>>>
+}
+
+impl<T: Send+Sync, P: Send+Copy, F, O> ResumableTask for RasterWorker<P, T, F>
+    where F: Fragment<O, Color=P>+Send+Sync,
+          T: Interpolate<Out=O>+Send+Sync+Debug
+
+{
+    fn resume(&mut self, _: &mut Schedule) -> WaitState {
+        let mut tile = self.tile.take().unwrap();
+        let mut count = 0;
+        while let Some(&(ref clip, ref or)) = self.polygons.try_recv() {
+            let z = Vector3::new(clip.x.z, clip.y.z, clip.z.z);
+            let bary = Barycentric::new(clip.map_vertex(|v| v.truncate()));
+            tile.raster(self.pos, self.scale, &z, &bary, or, &*self.fragment);
+            //println!("{:?}", clip);
+            count += 1;
+        }
+
+        if self.polygons.closed() {
+            self.result.take().unwrap().set(tile);
+            WaitState::Completed
+        } else {
+            self.tile = Some(tile);
+            WaitState::Pending(self.polygons.signal())
+        }
+    }
+}
+
+impl<P: Copy+Sync+Send+'static> Frame<P> {
     pub fn new(width: u32, height: u32, p: P) -> Frame<P> {
         Frame {
             width: width,
@@ -195,7 +235,7 @@ impl<P: Copy+Send+'static> Frame<P> {
                     |_| Future::from_value(Box::new(TileGroup::new(p)))
                 ).collect()
             ).collect(),
-            pool: ThreadPool::new(num_cpus::get())
+            pool: Frontend::new()
         }
     }
 
@@ -203,14 +243,14 @@ impl<P: Copy+Send+'static> Frame<P> {
         use std::mem;
         for row in self.tile.iter_mut() {
             for tile in row.iter_mut() {
-                let (tx, rx) = channel();
-                let mut new = Future::from_receiver(rx);
+                let (mut new, set) = Future::new();
                 mem::swap(tile, &mut new);
-                self.pool.execute(move || {
+                let signal = new.signal();
+                task(move |_| {
                     let mut t = new.get();
                     t.clear(p);
-                    tx.send(t).unwrap();
-                });
+                    set.set(t);
+                }).after(signal).start(&mut self.pool);
             }
         }
     }
@@ -227,14 +267,35 @@ impl<P: Copy+Send+'static> Frame<P> {
         let (hh, wh) = (hf/2., wf/2.);
         let scale = Vector2::new(hh.recip(), wh.recip());
 
-        let mut commands: Vec<Vec<Vec<(Triangle<Vector3<f32>>, Triangle<T>)>>> =
+        let fragment = Arc::new(fragment);
+
+        let mut commands: Vec<Vec<Sender<(Triangle<Vector3<f32>>, Triangle<T>)>>> =
             (0..(h / 32_)).map( 
-                |_| (0..(w / 32_)).map(
-                    |_| Vec::with_capacity(256)
+                |x| (0..(w / 32_)).map(
+                    |y| {
+                        use std::mem;
+                        let (tx, rx) = channel();
+                        let (mut future, set) = Future::new();
+                        let fragment = fragment.clone();
+                        mem::swap(&mut self.tile[x as usize][y as usize], &mut future);
+                        let signal = future.signal();
+
+                        task(move |sched| {
+                            let signal = rx.signal();
+                            RasterWorker {
+                                tile: Some(future.get()),
+                                polygons: rx,
+                                scale: scale,
+                                pos: Vector2::new(((x*32) as f32 - wh) * scale.x, ((y*32) as f32 - hh) * scale.y),
+                                fragment: fragment,
+                                result: Some(set)
+                            }.after(signal).start(sched);
+                        }).after(signal).start(&mut self.pool);
+                        tx
+                    }
                 ).collect()
             ).collect();
 
-        let fragment = Arc::new(fragment);
 
         for or in poly {
             let t = or.clone().map_vertex(|v| {
@@ -263,56 +324,8 @@ impl<P: Copy+Send+'static> Frame<P> {
                 for x in (min_x..max_x+1).step_by(32) {
                     let ix = (x / 32_) as usize;
                     let iy = (y / 32_) as usize;
-                    commands[ix][iy].push((clip.clone(), or.clone()));
-
-                    if commands[ix][iy].len() == commands[ix][iy].capacity() {
-                        let tile = &mut self.tile[ix][iy];
-                        let fragment = fragment.clone();
-                        let (tx, rx) = channel();
-                        let mut new = Future::from_receiver(rx);
-                        std::mem::swap(&mut new, tile);
-
-                        let mut tile_poly = Vec::with_capacity(256);
-                        std::mem::swap(&mut tile_poly, &mut commands[ix][iy]);
-                        self.pool.execute(move || {
-                            let mut t = new.get();
-                            let pos = Vector2::new((x as f32 - wh) * scale.x, (y as f32 - hh) * scale.y);
-                            for (clip, ref or) in tile_poly.into_iter() {
-                                let clip3 = Vector3::new(clip.x.z, clip.y.z, clip.z.z);
-                                let bary = Barycentric::new(clip.map_vertex(|v| v.truncate()));
-                                t.raster(pos, scale, &clip3, &bary, or, &*fragment);
-                            }
-                            tx.send(t).unwrap();
-                        });
-                    }
+                    commands[ix][iy].send((clip.clone(), or.clone()));
                 }
-            }
-        }
-
-        for (x, (row, row_poly)) in self.tile.iter_mut().zip(commands.into_iter()).enumerate() {
-            for (y, (tile, tile_poly)) in row.iter_mut().zip(row_poly.into_iter()).enumerate() {
-                if tile_poly.len() == 0 {
-                    continue;
-                }
-
-                let x = x as u32;
-                let y = y as u32;
-
-                let fragment = fragment.clone();
-                let (tx, rx) = channel();
-                let mut new = Future::from_receiver(rx);
-                std::mem::swap(&mut new, tile);
-
-                self.pool.execute(move || {
-                    let mut t = new.get();
-                    let pos = Vector2::new(((x*32) as f32 - wh) * scale.x, ((y*32) as f32 - hh) * scale.y);
-                    for (clip, ref or) in tile_poly.into_iter() {
-                        let clip3 = Vector3::new(clip.x.z, clip.y.z, clip.z.z);
-                        let bary = Barycentric::new(clip.map_vertex(|v| v.truncate()));
-                        t.raster(pos, scale, &clip3, &bary, or, &*fragment);
-                    }
-                    tx.send(t).unwrap();
-                });
             }
         }
     }
@@ -329,20 +342,19 @@ impl<P: Copy+Send+'static> Frame<P> {
 
         for (row, src_row) in self.tile.iter_mut().zip(src.tile.iter_mut()) {
             for (tile, src_tile) in row.iter_mut().zip(src_row.iter_mut()) {
-                let (tx_self, rx) = channel();
-                let mut new = Future::from_receiver(rx);
+                let (mut new, tx_self) = Future::new();
                 mem::swap(tile, &mut new);
-                let (tx_src, rx) = channel();
-                let mut src = Future::from_receiver(rx);
+                let (mut src, tx_src) = Future::new();
                 mem::swap(src_tile, &mut src);
                 let pixel = pixel.clone();
-                self.pool.execute(move || {
+                let (s0, s1) = (new.signal(), src.signal());
+                task(move |_| {
                     let mut dst = new.get();
                     let src = src.get();
                     dst.map(&src, &*pixel);
-                    tx_self.send(dst).unwrap();
-                    tx_src.send(src).unwrap();
-                });
+                    tx_self.set(dst);
+                    tx_src.set(src);
+                }).after(s0).after(s1).start(&mut self.pool);
             }
         }
     }
@@ -350,7 +362,7 @@ impl<P: Copy+Send+'static> Frame<P> {
     pub fn flush(&mut self) {
         for row in self.tile.iter_mut() {
             for tile in row.iter_mut() {
-                tile.get();
+                tile.signal().wait();
             }
         }
     }
@@ -358,12 +370,16 @@ impl<P: Copy+Send+'static> Frame<P> {
 
 impl Frame<Rgba<u8>> {
     pub fn to_image(&mut self) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+        use std::mem;
         let mut buffer = ImageBuffer::new(self.width, self.height);
 
         for (x, row) in self.tile.iter_mut().enumerate() {
             for (y, tile) in row.iter_mut().enumerate() {
-                let t = tile.get();
+                let (mut new, tx_self) = Future::new();
+                mem::swap(tile, &mut new);
+                let t = new.get();
                 t.write((x*32_) as u32, (y*32_) as u32, &mut buffer);
+                tx_self.set(t);
             }
         }
 

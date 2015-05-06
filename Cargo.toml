@@ -12,10 +12,19 @@ genmesh = "*"
 cgmath = "*"
 threadpool = "*"
 num_cpus="*"
+pulse = "*"
 
 [dependencies.image]
 git = "https://github.com/PistonDevelopers/image"
 
+[dependencies.snowstorm]
+path = "../snowstorm"
+
+[dependencies.future_pulse]
+path = "../future_pulse"
+
+[dependencies.fibe]
+path = "../fibe-rs"
 
 #[[example]]
 #name = "monkey"

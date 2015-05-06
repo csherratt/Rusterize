@@ -52,7 +52,7 @@ fn plane_subdivide(bench: &mut Bencher) {
     let mut frame = Frame::new(SIZE, SIZE, Rgba([0u8, 0, 0, 0]));
 
     let plane: Vec<Triangle<[f32; 4]>> =
-        generators::Plane::subdivide(64 as usize, 64 as usize)
+        generators::Plane::subdivide(512 as usize, 512 as usize)
             .triangulate()
             .vertex(|v| Vector4::new(v.0, v.1, 0., 1.).into_fixed())
             .collect();

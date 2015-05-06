@@ -13,7 +13,7 @@ use genmesh::generators;
 use genmesh::{Triangulate, MapToVertices, Quad};
 use image::Rgba;
 
-const SIZE: u32 = 64;
+const SIZE: u32 = 512;
 
 fn check(name: &str, mut frame: Frame<Rgba<u8>>) {
     let frame = frame.to_image();
