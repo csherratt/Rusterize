@@ -13,39 +13,45 @@ cgmath = "*"
 threadpool = "*"
 num_cpus="*"
 pulse = "*"
+vec_map = "*"
 
 [dependencies.image]
 git = "https://github.com/PistonDevelopers/image"
 
 [dependencies.snowstorm]
-path = "../snowstorm"
+git = "https://github.com/csherratt/snowstorm"
 
 [dependencies.future_pulse]
-path = "../future_pulse"
+git = "https://github.com/csherratt/future_pulse"
 
 [dependencies.fibe]
-path = "../fibe-rs"
+git = "https://github.com/kvark/fibe-rs.git"
 
-#[[example]]
-#name = "monkey"
-#path = "examples/monkey.rs"
+[dev-dependencies.gfx]
+git = "https://github.com/gfx-rs/gfx-rs"
 
-#[[example]]
-#name = "cull"
-#path = "examples/cull.rs"
+[dev-dependencies.gfx_device_gl]
+git = "https://github.com/gfx-rs/gfx_device_gl"
 
-#[[example]]
-#name = "two_pass"
-#path = "examples/two_pass.rs"
+[dev-dependencies.gfx_window_glfw]
+git = "https://github.com/gfx-rs/gfx_window_glfw"
 
+[dev-dependencies.pistoncore-sdl2_window]
+git = "https://github.com/pistondevelopers/sdl2_window"
+
+[dev-dependencies.piston2d-graphics]
+git = "https://github.com/pistondevelopers/graphics"
+
+[dev-dependencies.piston_window]
+git = "https://github.com/pistondevelopers/piston_window"
+
+[dev-dependencies.piston2d-opengl_graphics]
+git = "https://github.com/PistonDevelopers/opengl_graphics.git"
+
+[dev-dependencies.piston]
+git = "https://github.com/pistondevelopers/piston"
 
 [dev-dependencies]
 obj="*"
-#glfw="*"
 time="*"
 rand="*"
-#gfx="*"
-#gfx_device_gl="*"
-
-#[dev-dependencies.timeout_iter]
-#git="https://github.com/csherratt/timeout_iter"

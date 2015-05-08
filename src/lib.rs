@@ -1,4 +1,4 @@
-#![feature(simd, unboxed_closures, core, slice_patterns, std_misc, step_by)]
+#![feature(simd, unboxed_closures, core, slice_patterns, step_by)]
 #![allow(non_camel_case_types)]
 
 extern crate image;
@@ -8,10 +8,11 @@ extern crate fibe;
 extern crate snowstorm;
 extern crate future_pulse;
 extern crate pulse;
+extern crate vec_map;
 
 use std::sync::Arc;
 use std::fmt::Debug;
-use std::thread;
+use std::cell::UnsafeCell;
 
 use fibe::{Frontend, task, ResumableTask, WaitState, Schedule, IntoTask};
 use image::{GenericImage, ImageBuffer, Rgba};
@@ -20,6 +21,7 @@ use genmesh::{Triangle, MapVertex};
 use future_pulse::*;
 use pulse::*;
 use snowstorm::channel::*;
+use vec_map::*;
 
 pub use tile::{TileGroup, Tile, Raster};
 use vmath::Dot;
@@ -206,13 +208,11 @@ impl<T: Send+Sync, P: Send+Copy, F, O> ResumableTask for RasterWorker<P, T, F>
 {
     fn resume(&mut self, _: &mut Schedule) -> WaitState {
         let mut tile = self.tile.take().unwrap();
-        let mut count = 0;
+
         while let Some(&(ref clip, ref or)) = self.polygons.try_recv() {
             let z = Vector3::new(clip.x.z, clip.y.z, clip.z.z);
             let bary = Barycentric::new(clip.map_vertex(|v| v.truncate()));
             tile.raster(self.pos, self.scale, &z, &bary, or, &*self.fragment);
-            //println!("{:?}", clip);
-            count += 1;
         }
 
         if self.polygons.closed() {
@@ -269,33 +269,40 @@ impl<P: Copy+Sync+Send+'static> Frame<P> {
 
         let fragment = Arc::new(fragment);
 
-        let mut commands: Vec<Vec<Sender<(Triangle<Vector3<f32>>, Triangle<T>)>>> =
-            (0..(h / 32_)).map( 
-                |x| (0..(w / 32_)).map(
-                    |y| {
-                        use std::mem;
-                        let (tx, rx) = channel();
-                        let (mut future, set) = Future::new();
-                        let fragment = fragment.clone();
-                        mem::swap(&mut self.tile[x as usize][y as usize], &mut future);
-                        let signal = future.signal();
+        let mut queue = VecMap::new();
+        let width = self.width as usize;
+        let index = |x, y| {width * y + x};
 
-                        task(move |sched| {
-                            let signal = rx.signal();
-                            RasterWorker {
-                                tile: Some(future.get()),
-                                polygons: rx,
-                                scale: scale,
-                                pos: Vector2::new(((x*32) as f32 - wh) * scale.x, ((y*32) as f32 - hh) * scale.y),
-                                fragment: fragment,
-                                result: Some(set)
-                            }.after(signal).start(sched);
-                        }).after(signal).start(&mut self.pool);
-                        tx
-                    }
-                ).collect()
-            ).collect();
+        let mut command = |x, y, t| {
+            let i = index(x, y);
+            if queue.get(&i).is_none() {
+                use std::mem;
+                let (tx, rx) = channel();
+                let (mut future, set) = Future::new();
+                let fragment = fragment.clone();
+                mem::swap(&mut self.tile[x as usize][y as usize], &mut future);
+                let signal = future.signal();
 
+                task(move |sched| {
+                    let wh = wh;
+                    let hh = hh;
+                    let scale = scale;
+                    let signal = rx.signal();
+                    RasterWorker {
+                        tile: Some(future.get()),
+                        polygons: rx,
+                        scale: scale,
+                        pos: Vector2::new(((x*32) as f32 - wh) * scale.x,
+                                          ((y*32) as f32 - hh) * scale.y),
+                        fragment: fragment,
+                        result: Some(set)
+                    }.after(signal).start(sched);
+                }).after(signal).start(&mut self.pool);
+                queue.insert(i, tx);
+            }
+
+            queue.get_mut(&i).unwrap().send(t);
+        };
 
         for or in poly {
             let t = or.clone().map_vertex(|v| {
@@ -305,9 +312,9 @@ impl<P: Copy+Sync+Send+'static> Frame<P> {
 
             let clip = t.map_vertex(|v| v.truncate().div_s(v.w) );
 
-            /*if !is_backface(clip) {
+            if is_backface(clip) {
                 continue;
-            }*/
+            }
 
             let clip2 = clip.map_vertex(|v| Vector2::new(v.x * wh + wh, v.y * hh + hh));
             let max_x = clip2.x.x.ceil().partial_max(clip2.y.x.ceil().partial_max(clip2.z.x.ceil()));
@@ -324,7 +331,7 @@ impl<P: Copy+Sync+Send+'static> Frame<P> {
                 for x in (min_x..max_x+1).step_by(32) {
                     let ix = (x / 32_) as usize;
                     let iy = (y / 32_) as usize;
-                    commands[ix][iy].send((clip.clone(), or.clone()));
+                    command(ix, iy, (clip.clone(), or.clone()));
                 }
             }
         }
@@ -362,28 +369,39 @@ impl<P: Copy+Sync+Send+'static> Frame<P> {
     pub fn flush(&mut self) {
         for row in self.tile.iter_mut() {
             for tile in row.iter_mut() {
-                tile.signal().wait();
+                tile.signal().wait().unwrap();
             }
         }
     }
 }
 
 impl Frame<Rgba<u8>> {
-    pub fn to_image(&mut self) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+    pub fn into_image(&mut self, img: ImageBuffer<Rgba<u8>, Vec<u8>>) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
         use std::mem;
-        let mut buffer = ImageBuffer::new(self.width, self.height);
+        let buffer = UnsafeCell::new(img);
+        let mut signals = Vec::new();
 
         for (x, row) in self.tile.iter_mut().enumerate() {
             for (y, tile) in row.iter_mut().enumerate() {
                 let (mut new, tx_self) = Future::new();
                 mem::swap(tile, &mut new);
-                let t = new.get();
-                t.write((x*32_) as u32, (y*32_) as u32, &mut buffer);
-                tx_self.set(t);
+                let buff: &mut ImageBuffer<_, Vec<_>> = unsafe { mem::transmute(buffer.get()) };
+                let signal = new.signal();
+                signals.push(task(move |_| {
+                    let t = new.get();
+                    t.write((x*32_) as u32, (y*32_) as u32, buff);
+                    tx_self.set(t);
+                }).after(signal).start(&mut self.pool));
             }
         }
 
-        buffer
+        Barrier::new(&signals).wait().unwrap();
+        unsafe { buffer.into_inner() }
+    }
+
+    pub fn to_image(&mut self) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+        let img = ImageBuffer::new(self.width, self.height);
+        self.into_image(img)
     }
 }
 
